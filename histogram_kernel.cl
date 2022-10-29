@@ -1,5 +1,7 @@
+#pragma CL_VERSION_3_0
+
 __kernel void CalculateAverage(__global const int *pixels, __global double *average) {
-    __local int blocksum[64];
+    __local int blockSum[64];
 
     // Get local id
     int l_linear = get_local_linear_id();
@@ -7,30 +9,61 @@ __kernel void CalculateAverage(__global const int *pixels, __global double *aver
     // Get global id
     int g_linear = get_global_linear_id();
 
-    // Copy from global memory to local memory
-    blocksum[l_linear] = pixels[g_linear];
-
     // Get block position and size
-    int block_size = get_local_size(0) * get_local_size(1);
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy from global memory to local memory
+    blockSum[l_linear] = pixels[g_linear];
 
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
 
         if (l_linear < stride) {
-            blocksum[l_linear] += blocksum[l_linear + stride];
+            blockSum[l_linear] += blockSum[l_linear + stride];
         }
     }
 
     // Update average array
     if (l_linear == 0) {
         // Calculate block linear position
-        average[get_group_id(1) * get_num_groups(0) + get_group_id(0)] = (double)blocksum[0]/block_size;
+        average[get_group_id(1) * get_num_groups(0) + get_group_id(0)] = (double)blockSum[0]/blockSize;
+    }
+}
+
+__kernel void CalculateMovingAverage(__global const int *pixels, __global double *average) {
+    __local double blockAvg[64];
+
+    // Get local id
+    int l_linear = get_local_linear_id();
+
+    // Get global id
+    int g_linear = get_global_linear_id();
+
+    // Get block position and size
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy from global memory to local memory
+    blockAvg[l_linear] = pixels[g_linear];
+    
+    // Loop summing by splitting work group in half
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        if (l_linear < stride) {
+            blockAvg[l_linear] += (blockAvg[l_linear + stride] - blockAvg[l_linear])/(l_linear+1);
+        }
+    }
+    
+    // Update average array
+    if (l_linear == 0) {
+        // Calculate block linear position
+        average[get_group_id(1) * get_num_groups(0) + get_group_id(0)] = blockAvg[0];
     }
 }
 
 __kernel void CalculateVariance(__global const int *pixels, __global const double *average, __global double *variance) {
-    __local double blocksum[64];
+    __local double blockSum[64];
 
     // Get local id
     int l_linear = get_local_linear_id();
@@ -41,31 +74,31 @@ __kernel void CalculateVariance(__global const int *pixels, __global const doubl
     // Block linear position
     int block_linear = get_group_id(1) * get_num_groups(0) + get_group_id(0);
 
-    // Calculate initial portion of variance and copy to local memory
-    blocksum[l_linear] = (pixels[g_linear] - average[block_linear]) * (pixels[g_linear] - average[block_linear]);
-    
     // Get block position and size
-    int block_size = get_local_size(0) * get_local_size(1);
+    int blockSize = get_local_size(0) * get_local_size(1);
 
+    // Calculate initial portion of variance and copy to local memory
+    blockSum[l_linear] = (pixels[g_linear] - average[block_linear]) * (pixels[g_linear] - average[block_linear]);
+    
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
-            blocksum[l_linear] += blocksum[l_linear + stride];
+            blockSum[l_linear] += blockSum[l_linear + stride];
         }
     }
 
     // Update variance array
     if (l_linear == 0) {
         // Calculate variance
-        variance[block_linear] = (double)blocksum[0]/block_size;
+        variance[block_linear] = (double)blockSum[0]/blockSize;
     }
 }
 
 __kernel void CalculateAverageAndVariance(__global const int *pixels, __global double *average, __global double *variance) {
-    __local int blocksum_average[64];
-    __local double blocksum_variance[64];
+    __local int blockSumAverage[64];
+    __local double blockSumVariance[64];
 
     // Get local id
     int l_linear = get_local_linear_id();
@@ -76,50 +109,88 @@ __kernel void CalculateAverageAndVariance(__global const int *pixels, __global d
     // Block linear position
     int block_linear = get_group_id(1) * get_num_groups(0) + get_group_id(0);
 
-    // Copy memory from global to local
-    blocksum_average[l_linear] = pixels[g_linear];
-
     // Get block position and size
-    int block_size = get_local_size(0) * get_local_size(1);
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy memory from global to local
+    blockSumAverage[l_linear] = pixels[g_linear];
     
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
-            blocksum_average[l_linear] += blocksum_average[l_linear + stride];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
         }
     }
 
     // Update average array
     if (l_linear == 0) {
         // Calculate average
-        average[block_linear] = (double)blocksum_average[0]/block_size;
+        average[block_linear] = (double)blockSumAverage[0]/blockSize;
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // Calculate initial portion of variance and copy to local memory
-    blocksum_variance[l_linear] = (pixels[g_linear] - average[block_linear]) * (pixels[g_linear] - average[block_linear]);
+    blockSumVariance[l_linear] = (pixels[g_linear] - average[block_linear]) * (pixels[g_linear] - average[block_linear]);
 
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
-            blocksum_variance[l_linear] += blocksum_variance[l_linear + stride];
+            blockSumVariance[l_linear] += blockSumVariance[l_linear + stride];
         }
     }
 
     // Update variance array
     if (l_linear == 0) {
         // Calculate variance
-        variance[block_linear] = (double)blocksum_variance[0]/block_size;
+        variance[block_linear] = (double)blockSumVariance[0]/blockSize;
+    }
+}
+
+__kernel void CalculateOnePassVariance(__global const int *pixels, __global double *average, __global double *variance) {
+    __local int blockSumAverage[64];
+    __local int blockSumSquares[64];
+
+    // Get local id
+    int l_linear = get_local_linear_id();
+
+    // Get global id
+    int g_linear = get_global_linear_id();
+    
+    // Block linear position
+    int block_linear = get_group_id(1) * get_num_groups(0) + get_group_id(0);
+
+    // Get block position and size
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy memory from global to local
+    blockSumAverage[l_linear] = pixels[g_linear];
+    blockSumSquares[l_linear] = pixels[g_linear] * pixels[g_linear];
+
+    // Loop summing by splitting work group in half
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        if (l_linear < stride) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + stride];
+        }
+    }
+
+    // Update average array
+    if (l_linear == 0) {
+        // Calculate average
+        average[block_linear] = (double)blockSumAverage[0]/blockSize;
+        variance[block_linear] = (double)blockSumSquares[0]/blockSize - average[block_linear] * average[block_linear];
     }
 }
 
 __kernel void CalculateAverageHistogram(__global const int *pixels, __global const int *numOfBins, __global int *bins) {
-    __local int blocksum[64];
+    __local int blockSum[64];
 
     // Get local id
     int l_linear = get_local_linear_id();
@@ -127,26 +198,26 @@ __kernel void CalculateAverageHistogram(__global const int *pixels, __global con
     // Get global id
     int g_linear = get_global_linear_id();
 
-    // Copy from global memory to local memory
-    blocksum[l_linear] = pixels[g_linear];
-
     // Get block position and size
-    int block_size = get_local_size(0) * get_local_size(1);
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy from global memory to local memory
+    blockSum[l_linear] = pixels[g_linear];
 
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
 
         if (l_linear < stride) {
-            blocksum[l_linear] += blocksum[l_linear + stride];
+            blockSum[l_linear] += blockSum[l_linear + stride];
         }
     }
 
     // Update average array
     if (l_linear == 0) {
         // Calculate average
-        double average = (double)blocksum[0]/block_size;
-
+        double average = (double)blockSum[0]/blockSize;
+        
         // Calculate bin
         int interval = average/(256/numOfBins[0]);
         atomic_inc(&bins[interval]);
@@ -155,9 +226,9 @@ __kernel void CalculateAverageHistogram(__global const int *pixels, __global con
 }
 
 __kernel void CalculateVarianceHistogram(__global const int *pixels, __global const int *numOfBins, __global atomic_int *bins) {
-    __local int blocksum_average[64];
+    __local int blockSumAverage[64];
     __local double average;
-    __local double blocksum_variance[64];
+    __local double blockSumVariance[64];
 
     // Get local id
     int l_linear = get_local_linear_id();
@@ -168,49 +239,197 @@ __kernel void CalculateVarianceHistogram(__global const int *pixels, __global co
     // Block linear position
     int block_linear = get_group_id(1) * get_num_groups(0) + get_group_id(0);
 
-    // Copy memory from global to local
-    blocksum_average[l_linear] = pixels[g_linear];
-
     // Get block position and size
-    int block_size = get_local_size(0) * get_local_size(1);
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy memory from global to local
+    blockSumAverage[l_linear] = pixels[g_linear];
     
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
-            blocksum_average[l_linear] += blocksum_average[l_linear + stride];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
         }
     }
 
     // Update average array
     if (l_linear == 0) {
         // Calculate average
-        average = (double)blocksum_average[0]/block_size;
+        average = (double)blockSumAverage[0]/blockSize;
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // Calculate initial portion of variance and copy to local memory
-    blocksum_variance[l_linear] = (pixels[g_linear] - average) * (pixels[g_linear] - average);
+    blockSumVariance[l_linear] = (pixels[g_linear] - average) * (pixels[g_linear] - average);
 
     // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
-            blocksum_variance[l_linear] += blocksum_variance[l_linear + stride];
+            blockSumVariance[l_linear] += blockSumVariance[l_linear + stride];
         }
     }
 
     // Update variance array
     if (l_linear == 0) {
         // Calculate variance
-        double variance = (double)blocksum_variance[0]/block_size;
+        double variance = (double)blockSumVariance[0]/blockSize;
 
         // Calculate bin
         int interval = average/(256/numOfBins[0]);
         atomic_fetch_add_explicit(&bins[interval], variance, memory_order_relaxed, memory_scope_work_group);
+    }
+}
+
+__kernel void CalculateOnePassVarianceHistogram(__global const int *pixels, __global const int *numOfBins, __global atomic_int *bins) {
+    __local int blockSumAverage[64];
+    __local int blockSumSquares[64];
+
+    // Get local id
+    int l_linear = get_local_linear_id();
+
+    // Get global id
+    int g_linear = get_global_linear_id();
+    
+    // Block linear position
+    int block_linear = get_group_id(1) * get_num_groups(0) + get_group_id(0);
+
+    // Get block position and size
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy memory from global to local
+    blockSumAverage[l_linear] = pixels[g_linear];
+    blockSumSquares[l_linear] = pixels[g_linear] * pixels[g_linear];
+
+    // Loop summing by splitting work group in half
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        if (l_linear < stride) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + stride];
+        }
+    }
+
+    // Update average array
+    if (l_linear == 0) {
+        // Calculate average
+        double average = (double)blockSumAverage[0]/blockSize;
+
+        // Calculate variance
+        double variance = (double)blockSumSquares[0]/blockSize - average * average;
+
+        // Calculate bin
+        int interval = average/(256/numOfBins[0]);
+        atomic_fetch_add_explicit(&bins[interval], variance, memory_order_relaxed, memory_scope_work_group);
+    }
+}
+
+__kernel void CalculateAllHistograms(__global const int *pixels, __global const int *numOfBins, __global int *averageBins, __global atomic_int *varianceBins) {
+    __local int blockSumAverage[64];
+    __local double average;
+    __local double blockSumVariance[64];
+
+    // Get local id
+    int l_linear = get_local_linear_id();
+
+    // Get global id
+    int g_linear = get_global_linear_id();
+    
+    // Block linear position
+    int block_linear = get_group_id(1) * get_num_groups(0) + get_group_id(0);
+
+    // Get block position and size
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy memory from global to local
+    blockSumAverage[l_linear] = pixels[g_linear];
+    
+    // Loop summing by splitting work group in half
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        if (l_linear < stride) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
+        }
+    }
+
+    // Update average array
+    if (l_linear == 0) {
+        // Calculate average
+        average = (double)blockSumAverage[0]/blockSize;
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // Calculate initial portion of variance and copy to local memory
+    blockSumVariance[l_linear] = (pixels[g_linear] - average) * (pixels[g_linear] - average);
+
+    // Loop summing by splitting work group in half
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        if (l_linear < stride) {
+            blockSumVariance[l_linear] += blockSumVariance[l_linear + stride];
+        }
+    }
+
+    // Update variance array
+    if (l_linear == 0) {
+        // Calculate variance
+        double variance = (double)blockSumVariance[0]/blockSize;
+
+        // Calculate bin
+        int interval = average/(256/numOfBins[0]);
+        atomic_inc(&averageBins[interval]);
+        atomic_fetch_add_explicit(&varianceBins[interval], variance, memory_order_relaxed, memory_scope_work_group);
+    }
+}
+
+__kernel void CalculateAllHistogramsOnePass(__global const int *pixels, __global const int *numOfBins, __global int *averageBins, __global atomic_int *varianceBins) {
+    __local int blockSumAverage[64];
+    __local int blockSumSquares[64];
+
+    // Get local id
+    int l_linear = get_local_linear_id();
+
+    // Get global id
+    int g_linear = get_global_linear_id();
+    
+    // Get block position and size
+    int blockSize = get_local_size(0) * get_local_size(1);
+
+    // Copy memory from global to local
+    blockSumAverage[l_linear] = pixels[g_linear];
+    blockSumSquares[l_linear] = pixels[g_linear] * pixels[g_linear];
+
+    // Loop summing by splitting work group in half
+    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        if (l_linear < stride) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + stride];
+        }
+    }
+
+    // Update average array
+    if (l_linear == 0) {
+        // Calculate average
+        double average = (double)blockSumAverage[0]/blockSize;
+
+        // Calculate variance
+        double variance = (double)blockSumSquares[0]/blockSize - average * average;
+
+        // Calculate bin
+        int interval = average/(256/numOfBins[0]);
+
+        atomic_inc(&averageBins[interval]);
+        atomic_fetch_add_explicit(&varianceBins[interval], variance, memory_order_relaxed, memory_scope_work_group);
     }
 }
 
@@ -224,68 +443,4 @@ __kernel void CalculateHistogram(__global const double *input, __global const in
     // Calculate bin
     int interval = input[i]/(256/numOfBins[0]);
     atomic_fetch_add_explicit(&bins[interval], 1, memory_order_relaxed, memory_scope_work_group);
-}
-
-__kernel void CalculateAverageAllChannels(__global const int *pixels, __global double *average_y, __global double *average_u, __global double *average_v) {
-    __local int blocksum_y[64];
-    __local int blocksum_u[64];
-    __local int blocksum_v[64];
-
-    // Get local ids
-    int l_linear_y = get_local_linear_id();
-
-    // Get global ids
-    int g_linear_y = get_global_linear_id();
-
-    // Copy from global memory to local memory
-    blocksum_y[l_linear_y] = pixels[g_linear_y];
-
-    // Get block position and size
-    int block_size = get_local_size(0) * get_local_size(1);
-    int sub_block_size = block_size/4;
-
-    // Loop summing by splitting work group in half
-    for (uint stride = block_size/2; stride > 0; stride /= 2) {
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        if (l_linear_y < stride) {
-            blocksum_y[l_linear_y] += blocksum_y[l_linear_y + stride];
-        }
-    }
-
-    // Update average array
-    if (l_linear_y == 0) {
-        // Calculate block linear position
-        average_y[get_group_id(1) * get_num_groups(0) + get_group_id(0)] = (double)blocksum_y[0]/block_size;
-    }
-
-    // Get U and V ids
-    int l_col = get_local_id(0);
-    int l_row = get_local_id(1);
-    
-    if (l_col % 2 == 0 && l_row % 2 == 0) {
-        int l_linear_u = (l_row * get_local_size(0)+ 2*l_col)/4;     //floor(l_row/2) * block_width/2 + floor(l_col/2)
-        int l_linear_v = l_linear_u;
-
-        int g_linear_u = (get_local_id(1) * get_global_size(0) + 2*get_local_id(0))/4 + (get_global_size(0) * get_global_size(1));
-        int g_linear_v = g_linear_u + (get_global_size(0) * get_global_size(1))/4;
-
-        blocksum_u[l_linear_u] = pixels[g_linear_u];
-        blocksum_v[l_linear_v] = pixels[g_linear_v];
-   
-        for (uint stride = sub_block_size/2; stride > 0; stride /= 2) {
-            barrier(CLK_LOCAL_MEM_FENCE);
-
-            if (l_linear_u < stride) {
-                blocksum_u[l_linear_u] += blocksum_u[l_linear_u + stride];
-                blocksum_v[l_linear_v] += blocksum_v[l_linear_v + stride];
-            }
-        }
-
-        // Update average array
-        if (l_linear_u == 0) {
-            // Calculate block linear position
-            average_u[get_group_id(1) * get_num_groups(0) + 2*get_group_id(0)/4] = (double)blocksum_u[0]/block_size;
-        }
-    }
 }

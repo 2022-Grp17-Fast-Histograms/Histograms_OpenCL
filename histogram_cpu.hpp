@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <iostream>
 
-void CalculateAverage(std::vector<int> imageVector, int globalOffset, int imageWidth, int numOfBlocks, int blockSize, int blockWidth, int blockHeight, std::vector<double> &average) {
+void calculateAverage(std::vector<int> imageVector, int globalOffset, int imageWidth, int numOfBlocks, int blockSize, int blockWidth, int blockHeight, std::vector<double> &average) {
     int x = 0; //X COORD
     int y = 0; //Y COORD
     for (int block = 0; block < numOfBlocks; block++) {
@@ -30,7 +30,7 @@ void CalculateAverage(std::vector<int> imageVector, int globalOffset, int imageW
     }
 }
 
-void CalculateVariance(std::vector<int> imageVector, int globalOffset, int imageWidth, int numOfBlocks, int blockSize, int blockWidth, int blockHeight, std::vector<double> average, std::vector<double> &variance) {
+void calculateVariance(std::vector<int> imageVector, int globalOffset, int imageWidth, int numOfBlocks, int blockSize, int blockWidth, int blockHeight, std::vector<double> average, std::vector<double> &variance) {
     int x = 0; //X COORD
     int y = 0; //Y COORD
     for (int block = 0; block < numOfBlocks; block++) {
@@ -57,7 +57,7 @@ void CalculateVariance(std::vector<int> imageVector, int globalOffset, int image
     }
 }
 
-void CalculateAverageAndVariance(std::vector<int> imageVector, int globalOffset, int imageWidth, int numOfBlocks, int blockSize, int blockWidth, int blockHeight, std::vector<double> &average, std::vector<double> &variance) {
+void calculateAverageAndVariance(std::vector<int> imageVector, int globalOffset, int imageWidth, int numOfBlocks, int blockSize, int blockWidth, int blockHeight, std::vector<double> &average, std::vector<double> &variance) {
     int x = 0; //X COORD
     int y = 0; //Y COORD
     for (int block = 0; block < numOfBlocks; block++) {
@@ -96,7 +96,7 @@ void CalculateAverageAndVariance(std::vector<int> imageVector, int globalOffset,
     }
 }
 
-void CalculateHistogram(std::vector<double> input, int numOfBins, std::vector<int> &bins) {
+void calculateHistogram(std::vector<double> input, int numOfBins, std::vector<int> &bins) {
     int binSize = 256/numOfBins;
 
     for (int i = 0; i < input.size(); i++) {
@@ -105,7 +105,7 @@ void CalculateHistogram(std::vector<double> input, int numOfBins, std::vector<in
     }
 }
 
-void CalculateHistogram(std::vector<double> input, int numOfBins, std::vector<int> &bins, std::vector<double> increment) {
+void calculateHistogram(std::vector<double> input, int numOfBins, std::vector<int> &bins, std::vector<double> increment) {
     int binSize = 256/numOfBins;
 
     for (int i = 0; i < input.size(); i++) {
@@ -115,7 +115,7 @@ void CalculateHistogram(std::vector<double> input, int numOfBins, std::vector<in
 }
 
 template <typename T>
-bool ValidateVector(std::vector<T> input, std::vector<T> validatingVector) {
+bool validateVector(std::vector<T> input, std::vector<T> validatingVector) {
     bool result = false;
     for (int i = 0; i < input.size(); i++) {
         if (input[i] != validatingVector[i]){
@@ -126,4 +126,22 @@ bool ValidateVector(std::vector<T> input, std::vector<T> validatingVector) {
         }
     }
     return result;
+}
+
+template <typename T, typename U>
+void validateVectorError(std::vector<T> input, std::vector<U> validatingVector) {
+    double sum = 0;
+    for (int i = 0; i < input.size(); i++) {
+        if (validatingVector[i] != 0) {
+            sum += abs(validatingVector[i] - input[i])/validatingVector[i];
+        }
+    }
+    double error = sum/input.size()*100;
+    if (error == 0) {
+        std::cout << "PASS" << std::endl;
+        
+    }
+    else {
+        std::cout << "FAIL... Error = " << error << " %" << std::endl;
+    }
 }

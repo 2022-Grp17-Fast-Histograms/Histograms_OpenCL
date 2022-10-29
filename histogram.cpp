@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -18,16 +18,21 @@ const bool DEBUG_MODE_GPU = true;
 
 // Choose tests to run
 const bool ALL_CHANNELS = true;                             // TRUE = CALCULATE FOR ALL CHANNELS; FALSE = CALCULATE ONLY FOR LUMA (Y)
-const bool AVERAGE_TEST = true;                             // AVERAGE ONLY
+const bool AVERAGE_TEST_1 = true;                           // AVERAGE ONLY
+const bool AVERAGE_TEST_2 = true;                           // AVERAGE ONLY (INCREMENTAL AVERAGE ALG)
 const bool VARIANCE_TEST_1 = true;                          // AVERAGE + VARIANCE (ON SAME KERNEL)
 const bool VARIANCE_TEST_2 = true;                          // AVERAGE THEN VARIANCE (2 KERNELS)
-const bool AVERAGE_HISTOGRAM_TEST_1 = true;                 // AVERAGE + AVERAGE HISTOGRAM (ON SAME KERNEL)
+const bool VARIANCE_TEST_3 = true;                          // AVERAGE + VARIANCE (ONE PASS ALG)
+const bool AVERAGE_HISTOGRAM_TEST_1 = true;                 // AVERAGE HISTOGRAM (ON SAME KERNEL)
 const bool AVERAGE_HISTOGRAM_TEST_2 = true;                 // AVERAGE THEN AVERAGE HISTOGRAM (2 KERNELS)
-const bool VARIANCE_HISTOGRAM_TEST_1 = true;               // AVERAGE + VARIANCE + VARIANCE HISTOGRAMS (ON SAME KERNEL)
+const bool VARIANCE_HISTOGRAM_TEST_1 = true;                // VARIANCE HISTOGRAMS (ON SAME KERNEL)
+const bool VARIANCE_HISTOGRAM_TEST_2 = true;                // VARIANCE HISTOGRAMS (ONE PASS ALG)
+const bool ALL_HISTOGRAMS_TEST_1 = true;                     // ALL HISTOGRAMS
+const bool ALL_HISTOGRAMS_TEST_2 = true;                     // ALL HISTOGRAMS (ONE PASS ALG)
 
 // Choose outputs to be generated
-const bool GENERATE_AVERAGE_IMG = true;                     // NEEDS AVERAGE TEST 1
-const bool GENERATE_VARIANCE_IMG = true;                    // NEEDS VARIANCE TEST 1
+const bool GENERATE_AVERAGE_IMG = false;                     // NEEDS AVERAGE TEST 1
+const bool GENERATE_VARIANCE_IMG = false;                    // NEEDS VARIANCE TEST 1
 const bool EXPORT_AVERAGE_HISTOGRAM = true;                 // NEEDS AVERAGE HISTOGRAM TEST 1 FOR GPU HISTOGRAM
 const bool EXPORT_VARIANCE_HISTOGRAM = true;                // NEEDS VARIANCE HISTOGRAM TEST 1 FOR GPU HISTOGRAM
 
@@ -163,20 +168,20 @@ int main(int argc, char const *argv[])
     std::cout << "\n--------------------------AVERAGES----------------------------\n\n";
     // Average of Channel Y
     TimeInterval timer("milli");
-    CalculateAverage(imageVector, 0, IMG_WIDTH, y_NumOfBlocks, y_BlockSize, y_BlockWidth, y_BlockHeight, y_AverageCPU);
+    calculateAverage(imageVector, 0, IMG_WIDTH, y_NumOfBlocks, y_BlockSize, y_BlockWidth, y_BlockHeight, y_AverageCPU);
     y_ElapsedTimeAverageCPU = timer.Elapsed();
     std::cout << "Elapsed time Y Channel Average (ms) = " << y_ElapsedTimeAverageCPU << std::endl;
 
     if (ALL_CHANNELS) {
         // Average of Channel U
         timer = TimeInterval("milli");
-        CalculateAverage(imageVector, y_Size, IMG_WIDTH/2, u_NumOfBlocks, u_BlockSize, u_BlockWidth, u_BlockHeight, u_AverageCPU);
+        calculateAverage(imageVector, y_Size, IMG_WIDTH/2, u_NumOfBlocks, u_BlockSize, u_BlockWidth, u_BlockHeight, u_AverageCPU);
         u_ElapsedTimeAverageCPU = timer.Elapsed();
         std::cout << "Elapsed time U Channel Average (ms) = " << u_ElapsedTimeAverageCPU << std::endl;
 
         // Average of Channel V
         timer = TimeInterval("milli");
-        CalculateAverage(imageVector, y_Size + u_Size, IMG_WIDTH/2, v_NumOfBlocks, v_BlockSize, v_BlockWidth, v_BlockHeight, v_AverageCPU);
+        calculateAverage(imageVector, y_Size + u_Size, IMG_WIDTH/2, v_NumOfBlocks, v_BlockSize, v_BlockWidth, v_BlockHeight, v_AverageCPU);
         v_ElapsedTimeAverageCPU = timer.Elapsed();
         std::cout << "Elapsed time V Channel Average (ms) = " << v_ElapsedTimeAverageCPU << std::endl;
     }
@@ -184,20 +189,20 @@ int main(int argc, char const *argv[])
     std::cout << "\n--------------------------VARIANCES---------------------------\n\n";
     // Variance of Channel Y
     timer = TimeInterval("milli");
-    CalculateVariance(imageVector, 0, IMG_WIDTH, y_NumOfBlocks, y_BlockSize, y_BlockWidth, y_BlockHeight, y_AverageCPU, y_VarianceCPU);
+    calculateVariance(imageVector, 0, IMG_WIDTH, y_NumOfBlocks, y_BlockSize, y_BlockWidth, y_BlockHeight, y_AverageCPU, y_VarianceCPU);
     y_ElapsedTimeVarianceCPU = timer.Elapsed();
     std::cout << "Elapsed time Y Channel Variance (ms) = " << y_ElapsedTimeVarianceCPU << std::endl;
 
     if (ALL_CHANNELS) {
         // Average of Channel U
         timer = TimeInterval("milli");
-        CalculateVariance(imageVector, y_Size, IMG_WIDTH/2, u_NumOfBlocks, u_BlockSize, u_BlockWidth, u_BlockHeight, u_AverageCPU, u_VarianceCPU);
+        calculateVariance(imageVector, y_Size, IMG_WIDTH/2, u_NumOfBlocks, u_BlockSize, u_BlockWidth, u_BlockHeight, u_AverageCPU, u_VarianceCPU);
         u_ElapsedTimeVarianceCPU = timer.Elapsed();
         std::cout << "Elapsed time U Channel Variance (ms) = " << u_ElapsedTimeVarianceCPU << std::endl;
 
         // Average of Channel V
         timer = TimeInterval("milli");
-        CalculateVariance(imageVector, y_Size + u_Size, IMG_WIDTH/2, v_NumOfBlocks, v_BlockSize, v_BlockWidth, v_BlockHeight, v_AverageCPU, v_VarianceCPU);
+        calculateVariance(imageVector, y_Size + u_Size, IMG_WIDTH/2, v_NumOfBlocks, v_BlockSize, v_BlockWidth, v_BlockHeight, v_AverageCPU, v_VarianceCPU);
         v_ElapsedTimeVarianceCPU = timer.Elapsed();
         std::cout << "Elapsed time V Channel Variance (ms) = " << v_ElapsedTimeVarianceCPU << std::endl;
     }
@@ -205,40 +210,40 @@ int main(int argc, char const *argv[])
     std::cout << "\n-------------------------HISTOGRAMS---------------------------\n\n";
     // Average Histogram of Channel Y
     timer = TimeInterval("milli");
-    CalculateHistogram(y_AverageCPU, NUM_OF_BINS, y_AverageBinsCPU);
+    calculateHistogram(y_AverageCPU, NUM_OF_BINS, y_AverageBinsCPU);
     y_ElapsedTimeAverageHistCPU = timer.Elapsed();
     std::cout << "Elapsed time Y Channel Average Hist (ms) = " << y_ElapsedTimeAverageHistCPU << std::endl;
 
     if (ALL_CHANNELS) {
         // Average Histogram of Channel U
         timer = TimeInterval("milli");
-        CalculateHistogram(u_AverageCPU, NUM_OF_BINS, u_AverageBinsCPU);
+        calculateHistogram(u_AverageCPU, NUM_OF_BINS, u_AverageBinsCPU);
         u_ElapsedTimeAverageHistCPU = timer.Elapsed();
         std::cout << "Elapsed time U Channel Average Hist (ms) = " << u_ElapsedTimeAverageHistCPU << std::endl;
 
         // Average Histogram of Channel V
         timer = TimeInterval("milli");
-        CalculateHistogram(v_AverageCPU, NUM_OF_BINS, v_AverageBinsCPU);
+        calculateHistogram(v_AverageCPU, NUM_OF_BINS, v_AverageBinsCPU);
         v_ElapsedTimeAverageHistCPU = timer.Elapsed();
         std::cout << "Elapsed time V Channel Average Hist (ms) = " << v_ElapsedTimeAverageHistCPU << std::endl;
     }
 
     // Variance Histogram of Channel Y
     timer = TimeInterval("milli");
-    CalculateHistogram(y_AverageCPU, NUM_OF_BINS, y_VarianceBinsCPU, y_VarianceCPU);
+    calculateHistogram(y_AverageCPU, NUM_OF_BINS, y_VarianceBinsCPU, y_VarianceCPU);
     y_ElapsedTimeVarianceHistCPU = timer.Elapsed();
     std::cout << "Elapsed time Y Channel Variance Hist (ms) = " << y_ElapsedTimeVarianceHistCPU << std::endl;
     
     if (ALL_CHANNELS) {
         // Variance Histogram of Channel U
         timer = TimeInterval("milli");
-        CalculateHistogram(u_AverageCPU, NUM_OF_BINS, u_VarianceBinsCPU, u_VarianceCPU);
+        calculateHistogram(u_AverageCPU, NUM_OF_BINS, u_VarianceBinsCPU, u_VarianceCPU);
         u_ElapsedTimeVarianceHistCPU = timer.Elapsed();
         std::cout << "Elapsed time U Channel Variance Hist (ms) = " << u_ElapsedTimeVarianceHistCPU << std::endl;
 
         // Variance Histogram of Channel V
         timer = TimeInterval("milli");
-        CalculateHistogram(v_AverageCPU, NUM_OF_BINS, v_VarianceBinsCPU, v_VarianceCPU);
+        calculateHistogram(v_AverageCPU, NUM_OF_BINS, v_VarianceBinsCPU, v_VarianceCPU);
         v_ElapsedTimeVarianceHistCPU = timer.Elapsed();
         std::cout << "Elapsed time V Channel Variance Hist (ms) = " << v_ElapsedTimeVarianceHistCPU << std::endl;
     }
@@ -298,32 +303,36 @@ int main(int argc, char const *argv[])
     }
 
     // Build Program
-    err = program.build(devices);
+    err = program.build(devices, "-cl-std=CL3.0");
     if (DEBUG_MODE_GPU && err < 0) {
         std::cout << "Build Program ERROR: " << err << std::endl;
     }
 
     // Create Kernels
     cl::Kernel averageKernel(program, "CalculateAverage");
+    cl::Kernel movingAverageKernel(program, "CalculateMovingAverage");
     cl::Kernel varianceKernel(program, "CalculateVariance");
+    cl::Kernel varianceOnePassKernel(program, "CalculateOnePassVariance");
     cl::Kernel averageVarianceKernel(program, "CalculateAverageAndVariance");
     cl::Kernel averageHistKernel(program, "CalculateAverageHistogram");
     cl::Kernel histogramKernel(program, "CalculateHistogram");
     cl::Kernel varianceHistKernel(program, "CalculateVarianceHistogram");
-    
+    cl::Kernel varianceOnePassHistKernel(program, "CalculateOnePassVarianceHistogram");
+    cl::Kernel allHistsKernel(program, "CalculateAllHistograms");
+    cl::Kernel allHistsOnePassKernel(program, "CalculateAllHistogramsOnePass");
     
     // Create Input Buffers
-    cl::Buffer y_pixelBuffer(context, CL_MEM_READ_ONLY, y_Size * sizeof(int), NULL, &err);
+    cl::Buffer y_PixelBuffer(context, CL_MEM_READ_ONLY, y_Size * sizeof(int), NULL, &err);
     if (DEBUG_MODE_GPU && err < 0) {
-        std::cout << "Create y_pixelBuffer ERROR: " << err << std::endl;
+        std::cout << "Create y_PixelBuffer ERROR: " << err << std::endl;
     }
-    cl::Buffer u_pixelBuffer(context, CL_MEM_READ_ONLY, u_Size * sizeof(int), NULL, &err);
+    cl::Buffer u_PixelBuffer(context, CL_MEM_READ_ONLY, u_Size * sizeof(int), NULL, &err);
     if (DEBUG_MODE_GPU && err < 0) {
-        std::cout << "Create u_pixelBuffer ERROR: " << err << std::endl;
+        std::cout << "Create u_PixelBuffer ERROR: " << err << std::endl;
     }
-    cl::Buffer v_pixelBuffer(context, CL_MEM_READ_ONLY, v_Size * sizeof(int), NULL, &err);
+    cl::Buffer v_PixelBuffer(context, CL_MEM_READ_ONLY, v_Size * sizeof(int), NULL, &err);
     if (DEBUG_MODE_GPU && err < 0) {
-        std::cout << "Create v_pixelBuffer ERROR: " << err << std::endl;
+        std::cout << "Create v_PixelBuffer ERROR: " << err << std::endl;
     }
     cl::Buffer numOfBinsBuffer(context, CL_MEM_READ_ONLY, 1 * sizeof(int), NULL, &err);
     if (DEBUG_MODE_GPU && err < 0) {
@@ -331,17 +340,17 @@ int main(int argc, char const *argv[])
     }
 
     // Write Input Buffers
-    err = commandQueue.enqueueWriteBuffer(y_pixelBuffer, CL_TRUE, 0, y_Size * sizeof(int), &imageVector[0], NULL, NULL);            
+    err = commandQueue.enqueueWriteBuffer(y_PixelBuffer, CL_TRUE, 0, y_Size * sizeof(int), &imageVector[0], NULL, NULL);            
     if (DEBUG_MODE_GPU && err < 0) {
-        std::cout << "Write y_pixelBuffer ERROR: " << err << std::endl;
+        std::cout << "Write y_PixelBuffer ERROR: " << err << std::endl;
     }
-    err = commandQueue.enqueueWriteBuffer(u_pixelBuffer, CL_TRUE, 0, u_Size * sizeof(int), &imageVector[y_Size], NULL, NULL);            
+    err = commandQueue.enqueueWriteBuffer(u_PixelBuffer, CL_TRUE, 0, u_Size * sizeof(int), &imageVector[y_Size], NULL, NULL);            
     if (DEBUG_MODE_GPU && err < 0) {
-        std::cout << "Write u_pixelBuffer ERROR: " << err << std::endl;
+        std::cout << "Write u_PixelBuffer ERROR: " << err << std::endl;
     }
-    err = commandQueue.enqueueWriteBuffer(v_pixelBuffer, CL_TRUE, 0, v_Size * sizeof(int), &imageVector[y_Size + u_Size], NULL, NULL);            
+    err = commandQueue.enqueueWriteBuffer(v_PixelBuffer, CL_TRUE, 0, v_Size * sizeof(int), &imageVector[y_Size + u_Size], NULL, NULL);            
     if (DEBUG_MODE_GPU && err < 0) {
-        std::cout << "Write v_pixelBuffer ERROR: " << err << std::endl;
+        std::cout << "Write v_PixelBuffer ERROR: " << err << std::endl;
     }
     err = commandQueue.enqueueWriteBuffer(numOfBinsBuffer, CL_TRUE, 0, 1 * sizeof(int), &NUM_OF_BINS, NULL, NULL);            
     if (DEBUG_MODE_GPU && err < 0) {
@@ -357,8 +366,8 @@ int main(int argc, char const *argv[])
     cl::NDRange v_GlobalRange(IMG_WIDTH/2, IMG_HEIGHT/2);
     cl::NDRange v_LocalRange(v_BlockWidth, v_BlockHeight);
 
-    if (AVERAGE_TEST) {
-        std::cout << "\n=========================AVERAGE TEST=========================\n\n";
+    if (AVERAGE_TEST_1) {
+        std::cout << "\n=========================AVERAGE TEST 1=========================\n\n";
         // Create Output Buffers
         cl::Buffer y_AverageBuffer(context, CL_MEM_WRITE_ONLY, y_NumOfBlocks * sizeof(double), NULL, &err);
         if (DEBUG_MODE_GPU && err < 0) {
@@ -382,7 +391,7 @@ int main(int argc, char const *argv[])
         double y_ElapsedTimeAverageGPU, u_ElapsedTimeAverageGPU, v_ElapsedTimeAverageGPU;
 
         // Execute for Channel Y
-        averageKernel.setArg(0, y_pixelBuffer);
+        averageKernel.setArg(0, y_PixelBuffer);
         averageKernel.setArg(1, y_AverageBuffer);
         err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
         event.wait();
@@ -394,7 +403,7 @@ int main(int argc, char const *argv[])
         // Calculate for other Channels
         if (ALL_CHANNELS) {
             // Execute for Channel U
-            averageKernel.setArg(0, u_pixelBuffer);
+            averageKernel.setArg(0, u_PixelBuffer);
             averageKernel.setArg(1, u_AverageBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
             event.wait();
@@ -404,7 +413,7 @@ int main(int argc, char const *argv[])
             u_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
     
             // Execute for Channel V
-            averageKernel.setArg(0, v_pixelBuffer);
+            averageKernel.setArg(0, v_PixelBuffer);
             averageKernel.setArg(1, v_AverageBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
             event.wait();
@@ -428,33 +437,16 @@ int main(int argc, char const *argv[])
             std::cout << "Reading v_AverageBuffer ERROR: " << err << std::endl;
         }
 
-        // Validate Average of Channel Y
+        // Validate Average Vectors
         std::cout << "Validating Y Average GPU: ";
-        if (ValidateVector<double>(y_AverageGPU, y_AverageCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        validateVectorError(y_AverageGPU, y_AverageCPU);
 
         if (ALL_CHANNELS) {
-            // Validate Average of Channel U
             std::cout << "Validating U Average GPU: ";
-            if (ValidateVector<double>(u_AverageGPU, u_AverageCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(u_AverageGPU, u_AverageCPU);
 
-            // Validate Average of Channel V
             std::cout << "Validating V Average GPU: ";
-            if (ValidateVector<double>(v_AverageGPU, v_AverageCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(v_AverageGPU, v_AverageCPU);
         }
 
         // Generate Output image
@@ -497,6 +489,98 @@ int main(int argc, char const *argv[])
         }
     }
 
+    if (AVERAGE_TEST_2) {
+        std::cout << "\n=========================AVERAGE TEST 2=========================\n\n";
+        // Create Output Buffers
+        cl::Buffer y_AverageBuffer(context, CL_MEM_READ_WRITE, y_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_AverageBuffer(context, CL_MEM_READ_WRITE, u_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_AverageBuffer(context, CL_MEM_READ_WRITE, v_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageBuffer ERROR: " << err << std::endl;
+        }
+
+        // Create Output Vectors
+        std::vector<double> y_AverageGPU(y_NumOfBlocks);
+        std::vector<double> u_AverageGPU(u_NumOfBlocks);
+        std::vector<double> v_AverageGPU(v_NumOfBlocks);
+ 
+        // Create Timer Variables
+        double y_ElapsedTimeAverageGPU, u_ElapsedTimeAverageGPU, v_ElapsedTimeAverageGPU;
+
+        // Execute for Channel Y
+        movingAverageKernel.setArg(0, y_PixelBuffer);
+        movingAverageKernel.setArg(1, y_AverageBuffer);
+        err = commandQueue.enqueueNDRangeKernel(movingAverageKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
+        event.wait();
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Execution Y ERROR: " << err << std::endl;
+        }
+        y_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        
+        // Calculate for other Channels
+        if (ALL_CHANNELS) {
+            // Execute for Channel U
+            movingAverageKernel.setArg(0, u_PixelBuffer);
+            movingAverageKernel.setArg(1, u_AverageBuffer);
+            err = commandQueue.enqueueNDRangeKernel(movingAverageKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution U ERROR: " << err << std::endl;
+            }
+            u_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+    
+            // Execute for Channel V
+            movingAverageKernel.setArg(0, v_PixelBuffer);
+            movingAverageKernel.setArg(1, v_AverageBuffer);
+            err = commandQueue.enqueueNDRangeKernel(movingAverageKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution V ERROR: " << err << std::endl;
+            }
+            v_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        }
+
+        // Read responsess
+        err = commandQueue.enqueueReadBuffer(y_AverageBuffer, CL_TRUE, 0, y_NumOfBlocks * sizeof(double), &y_AverageGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_AverageBuffer, CL_TRUE, 0, u_NumOfBlocks * sizeof(double), &u_AverageGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_AverageBuffer, CL_TRUE, 0, v_NumOfBlocks * sizeof(double), &v_AverageGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageBuffer ERROR: " << err << std::endl;
+        }
+
+        // Validate Average Vectors
+        std::cout << "Validating Y Average GPU: ";
+        validateVectorError(y_AverageGPU, y_AverageCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average GPU: ";
+            validateVectorError(u_AverageGPU, u_AverageCPU);
+
+            std::cout << "Validating V Average GPU: ";
+            validateVectorError(v_AverageGPU, v_AverageCPU);
+        }
+
+        std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
+        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeAverageGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeAverageGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeAverageGPU << std::endl;
+            std::cout << "Elapsed time Average (Y + U + V) (ms) = " << y_ElapsedTimeAverageGPU + u_ElapsedTimeAverageGPU + v_ElapsedTimeAverageGPU << std::endl;
+        }
+    }
+     
     if (VARIANCE_TEST_1) {
         std::cout << "\n=======================VARIANCE TEST 1========================\n\n";
         // Create Output Buffers
@@ -539,7 +623,7 @@ int main(int argc, char const *argv[])
         double y_ElapsedTimeVarianceGPU, u_ElapsedTimeVarianceGPU, v_ElapsedTimeVarianceGPU;
 
         // Execute for Channel Y
-        averageVarianceKernel.setArg(0, y_pixelBuffer);
+        averageVarianceKernel.setArg(0, y_PixelBuffer);
         averageVarianceKernel.setArg(1, y_AverageBuffer);
         averageVarianceKernel.setArg(2, y_VarianceBuffer);
         err = commandQueue.enqueueNDRangeKernel(averageVarianceKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
@@ -552,7 +636,7 @@ int main(int argc, char const *argv[])
         // Calculate for other Channels
         if (ALL_CHANNELS) {
             // Execute for Channel U
-            averageVarianceKernel.setArg(0, u_pixelBuffer);
+            averageVarianceKernel.setArg(0, u_PixelBuffer);
             averageVarianceKernel.setArg(1, u_AverageBuffer);
             averageVarianceKernel.setArg(2, u_VarianceBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageVarianceKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
@@ -563,7 +647,7 @@ int main(int argc, char const *argv[])
             u_ElapsedTimeVarianceGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
     
             // Execute for Channel V
-            averageVarianceKernel.setArg(0, v_pixelBuffer);
+            averageVarianceKernel.setArg(0, v_PixelBuffer);
             averageVarianceKernel.setArg(1, v_AverageBuffer);
             averageVarianceKernel.setArg(2, v_VarianceBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageVarianceKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
@@ -602,62 +686,28 @@ int main(int argc, char const *argv[])
             std::cout << "Reading v_VarianceBuffer ERROR: " << err << std::endl;
         }
 
-        // Validate Average of Channel Y
+        // Validate Average Vectors
         std::cout << "Validating Y Average GPU: ";
-        if (ValidateVector<double>(y_AverageGPU, y_AverageCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        validateVectorError(y_AverageGPU, y_AverageCPU);
 
         if (ALL_CHANNELS) {
-            // Validate Average of Channel U
             std::cout << "Validating U Average GPU: ";
-            if (ValidateVector<double>(u_AverageGPU, u_AverageCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(u_AverageGPU, u_AverageCPU);
 
-            // Validate Average of Channel V
             std::cout << "Validating V Average GPU: ";
-            if (ValidateVector<double>(v_AverageGPU, v_AverageCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(v_AverageGPU, v_AverageCPU);
         }
 
-        // Validate Variance of Channel Y
+        // Validate Variance Vectors
         std::cout << "Validating Y Variance GPU: ";
-        if (ValidateVector<double>(y_VarianceGPU, y_VarianceCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        validateVectorError(y_VarianceGPU, y_VarianceCPU);
 
         if (ALL_CHANNELS) {
-            // Validate Variance of Channel U
             std::cout << "Validating U Variance GPU: ";
-            if (ValidateVector<double>(u_VarianceGPU, u_VarianceCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(u_VarianceGPU, u_VarianceCPU);
 
-            // Validate Variance of Channel V
             std::cout << "Validating V Variance GPU: ";
-            if (ValidateVector<double>(v_VarianceGPU, v_VarianceCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(v_VarianceGPU, v_VarianceCPU);
         }
 
         // Generate Output image
@@ -743,7 +793,7 @@ int main(int argc, char const *argv[])
         double y_ElapsedTimeVarianceGPU, u_ElapsedTimeVarianceGPU, v_ElapsedTimeVarianceGPU;
 
         // Execute Average for Channel Y
-        averageKernel.setArg(0, y_pixelBuffer);
+        averageKernel.setArg(0, y_PixelBuffer);
         averageKernel.setArg(1, y_AverageBuffer);
         err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
         event.wait();
@@ -753,7 +803,7 @@ int main(int argc, char const *argv[])
         y_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
 
         // Execute Variance for Channel Y
-        varianceKernel.setArg(0, y_pixelBuffer);
+        varianceKernel.setArg(0, y_PixelBuffer);
         varianceKernel.setArg(1, y_AverageBuffer);
         varianceKernel.setArg(2, y_VarianceBuffer);
         err = commandQueue.enqueueNDRangeKernel(varianceKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
@@ -766,7 +816,7 @@ int main(int argc, char const *argv[])
         // Calculate for other Channels
         if (ALL_CHANNELS) {
             // Execute Average for Channel U
-            averageKernel.setArg(0, u_pixelBuffer);
+            averageKernel.setArg(0, u_PixelBuffer);
             averageKernel.setArg(1, u_AverageBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
             event.wait();
@@ -776,7 +826,7 @@ int main(int argc, char const *argv[])
             u_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
 
             // Execute Variance for Channel U
-            varianceKernel.setArg(0, u_pixelBuffer);
+            varianceKernel.setArg(0, u_PixelBuffer);
             varianceKernel.setArg(1, u_AverageBuffer);
             varianceKernel.setArg(2, u_VarianceBuffer);
             err = commandQueue.enqueueNDRangeKernel(varianceKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
@@ -787,7 +837,7 @@ int main(int argc, char const *argv[])
             u_ElapsedTimeVarianceGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
             
             // Execute Average for Channel V
-            averageKernel.setArg(0, v_pixelBuffer);
+            averageKernel.setArg(0, v_PixelBuffer);
             averageKernel.setArg(1, v_AverageBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
             event.wait();
@@ -797,7 +847,7 @@ int main(int argc, char const *argv[])
             v_ElapsedTimeAverageGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
 
             // Execute Variance for Channel V
-            varianceKernel.setArg(0, v_pixelBuffer);
+            varianceKernel.setArg(0, v_PixelBuffer);
             varianceKernel.setArg(1, v_AverageBuffer);
             varianceKernel.setArg(2, v_VarianceBuffer);
             err = commandQueue.enqueueNDRangeKernel(varianceKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
@@ -836,62 +886,28 @@ int main(int argc, char const *argv[])
             std::cout << "Reading v_VarianceBuffer ERROR: " << err << std::endl;
         }
 
-        // Validate Average of Channel Y
+        // Validate Average Vectors
         std::cout << "Validating Y Average GPU: ";
-        if (ValidateVector<double>(y_AverageGPU, y_AverageCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        validateVectorError(y_AverageGPU, y_AverageCPU);
 
         if (ALL_CHANNELS) {
-            // Validate Average of Channel U
             std::cout << "Validating U Average GPU: ";
-            if (ValidateVector<double>(u_AverageGPU, u_AverageCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(u_AverageGPU, u_AverageCPU);
 
-            // Validate Average of Channel V
             std::cout << "Validating V Average GPU: ";
-            if (ValidateVector<double>(v_AverageGPU, v_AverageCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(v_AverageGPU, v_AverageCPU);
         }
 
-        // Validate Variance of Channel Y
+        // Validate Variance Vectors
         std::cout << "Validating Y Variance GPU: ";
-        if (ValidateVector<double>(y_VarianceGPU, y_VarianceCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        validateVectorError(y_VarianceGPU, y_VarianceCPU);
 
         if (ALL_CHANNELS) {
-            // Validate Variance of Channel U
             std::cout << "Validating U Variance GPU: ";
-            if (ValidateVector<double>(u_VarianceGPU, u_VarianceCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(u_VarianceGPU, u_VarianceCPU);
 
-            // Validate Variance of Channel V
             std::cout << "Validating V Variance GPU: ";
-            if (ValidateVector<double>(v_VarianceGPU, v_VarianceCPU)) {
-                std::cout << "PASS" << std::endl;
-            }
-            else {
-                std::cout << "FAIL" << std::endl;
-            }
+            validateVectorError(v_VarianceGPU, v_VarianceCPU);
         }
 
         std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
@@ -908,6 +924,144 @@ int main(int argc, char const *argv[])
             std::cout << "Elapsed time Average (Y + U + V) (ms) = " << y_ElapsedTimeAverageGPU + u_ElapsedTimeAverageGPU + v_ElapsedTimeAverageGPU << std::endl;
             std::cout << "Elapsed time Variance (Y + U + V) (ms) = " << y_ElapsedTimeVarianceGPU + u_ElapsedTimeVarianceGPU + v_ElapsedTimeVarianceGPU << std::endl;
             std::cout << "Elapsed time (Avg + Var) (Y + U + V) (ms) = " << y_ElapsedTimeAverageGPU + u_ElapsedTimeAverageGPU + v_ElapsedTimeAverageGPU + y_ElapsedTimeVarianceGPU + u_ElapsedTimeVarianceGPU + v_ElapsedTimeVarianceGPU << std::endl;
+        }
+    }
+
+    if (VARIANCE_TEST_3) {
+        std::cout << "\n=======================VARIANCE TEST 3========================\n\n";
+        // Create Output Buffers
+        cl::Buffer y_AverageBuffer(context, CL_MEM_WRITE_ONLY, y_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer y_VarianceBuffer(context, CL_MEM_WRITE_ONLY, y_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_VarianceBuffer ERROR: " << err << std::endl;
+        }
+ 
+        cl::Buffer u_AverageBuffer(context, CL_MEM_WRITE_ONLY, u_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_VarianceBuffer(context, CL_MEM_WRITE_ONLY, u_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_VarianceBuffer ERROR: " << err << std::endl;
+        }
+
+        cl::Buffer v_AverageBuffer(context, CL_MEM_WRITE_ONLY, v_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_VarianceBuffer(context, CL_MEM_WRITE_ONLY, v_NumOfBlocks * sizeof(double), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_VarianceBuffer ERROR: " << err << std::endl;
+        }
+
+        // Create Output Vectors
+        std::vector<double> y_AverageGPU(y_NumOfBlocks);
+        std::vector<double> y_VarianceGPU(y_NumOfBlocks);
+        std::vector<double> u_AverageGPU(y_NumOfBlocks);
+        std::vector<double> u_VarianceGPU(y_NumOfBlocks);
+        std::vector<double> v_AverageGPU(y_NumOfBlocks);
+        std::vector<double> v_VarianceGPU(y_NumOfBlocks);
+
+        // Create Timer Variables
+        double y_ElapsedTimeVarianceGPU, u_ElapsedTimeVarianceGPU, v_ElapsedTimeVarianceGPU;
+
+        // Execute for Channel Y
+        varianceOnePassKernel.setArg(0, y_PixelBuffer);
+        varianceOnePassKernel.setArg(1, y_AverageBuffer);
+        varianceOnePassKernel.setArg(2, y_VarianceBuffer);
+        err = commandQueue.enqueueNDRangeKernel(varianceOnePassKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
+        event.wait();
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Execution Y ERROR: " << err << std::endl;
+        }
+        y_ElapsedTimeVarianceGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        
+        // Calculate for other Channels
+        if (ALL_CHANNELS) {
+            // Execute for Channel U
+            varianceOnePassKernel.setArg(0, u_PixelBuffer);
+            varianceOnePassKernel.setArg(1, u_AverageBuffer);
+            varianceOnePassKernel.setArg(2, u_VarianceBuffer);
+            err = commandQueue.enqueueNDRangeKernel(varianceOnePassKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution U ERROR: " << err << std::endl;
+            }
+            u_ElapsedTimeVarianceGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+    
+            // Execute for Channel V
+            varianceOnePassKernel.setArg(0, v_PixelBuffer);
+            varianceOnePassKernel.setArg(1, v_AverageBuffer);
+            varianceOnePassKernel.setArg(2, v_VarianceBuffer);
+            err = commandQueue.enqueueNDRangeKernel(varianceOnePassKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution V ERROR: " << err << std::endl;
+            }
+            v_ElapsedTimeVarianceGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        }
+
+        // Read responsess
+        err = commandQueue.enqueueReadBuffer(y_AverageBuffer, CL_TRUE, 0, y_NumOfBlocks * sizeof(double), &y_AverageGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(y_VarianceBuffer, CL_TRUE, 0, y_NumOfBlocks * sizeof(double), &y_VarianceGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceBuffer ERROR: " << err << std::endl;
+        }
+
+        err = commandQueue.enqueueReadBuffer(u_AverageBuffer, CL_TRUE, 0, u_NumOfBlocks * sizeof(double), &u_AverageGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_VarianceBuffer, CL_TRUE, 0, u_NumOfBlocks * sizeof(double), &u_VarianceGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceBuffer ERROR: " << err << std::endl;
+        }
+
+        err = commandQueue.enqueueReadBuffer(v_AverageBuffer, CL_TRUE, 0, v_NumOfBlocks * sizeof(double), &v_AverageGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_VarianceBuffer, CL_TRUE, 0, v_NumOfBlocks * sizeof(double), &v_VarianceGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceBuffer ERROR: " << err << std::endl;
+        }
+
+        // Validate Average Vectors
+        std::cout << "Validating Y Average GPU: ";
+        validateVectorError(y_AverageGPU, y_AverageCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average GPU: ";
+            validateVectorError(u_AverageGPU, u_AverageCPU);
+
+            std::cout << "Validating V Average GPU: ";
+            validateVectorError(v_AverageGPU, v_AverageCPU);
+        }
+
+        // Validate Variance Vectors
+        std::cout << "Validating Y Variance GPU: ";
+        validateVectorError(y_VarianceGPU, y_VarianceCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Variance GPU: ";
+            validateVectorError(u_VarianceGPU, u_VarianceCPU);
+
+            std::cout << "Validating V Variance GPU: ";
+            validateVectorError(v_VarianceGPU, v_VarianceCPU);
+        }
+
+        std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
+         std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeVarianceGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeVarianceGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeVarianceGPU << std::endl;
+            std::cout << "Elapsed time Average + Variance (Y + U + V) (ms) = " << y_ElapsedTimeVarianceGPU + u_ElapsedTimeVarianceGPU + v_ElapsedTimeVarianceGPU << std::endl;
         }
     }
 
@@ -952,7 +1106,7 @@ int main(int argc, char const *argv[])
         double v_ElapsedTimeAverageHistGPU;
 
         // Execute Histogram for Channel Y
-        averageHistKernel.setArg(0, y_pixelBuffer);
+        averageHistKernel.setArg(0, y_PixelBuffer);
         averageHistKernel.setArg(1, numOfBinsBuffer);
         averageHistKernel.setArg(2, y_AverageHistBuffer);
         err = commandQueue.enqueueNDRangeKernel(averageHistKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
@@ -965,7 +1119,7 @@ int main(int argc, char const *argv[])
         // Calculate other channels
         if (ALL_CHANNELS) {
             // U Channel
-            averageHistKernel.setArg(0, u_pixelBuffer);
+            averageHistKernel.setArg(0, u_PixelBuffer);
             averageHistKernel.setArg(1, numOfBinsBuffer);
             averageHistKernel.setArg(2, u_AverageHistBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageHistKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
@@ -976,7 +1130,7 @@ int main(int argc, char const *argv[])
             u_ElapsedTimeAverageHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
             
             // V Channel
-            averageHistKernel.setArg(0, v_pixelBuffer);
+            averageHistKernel.setArg(0, v_PixelBuffer);
             averageHistKernel.setArg(1, numOfBinsBuffer);
             averageHistKernel.setArg(2, v_AverageHistBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageHistKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
@@ -1002,34 +1156,25 @@ int main(int argc, char const *argv[])
             std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
         }
         
-        // Validate Average Histogram of Channel Y
-        std::cout << "Validating Y Average Histogram GPU: ";
-        if (ValidateVector<int>(y_AverageBinsGPU, y_AverageBinsCPU)) {
-            std::cout << "PASS" << std::endl;
+        // Validate Average Histogram Vectors
+        std::cout << "Validating Y Average Hist GPU: ";
+        validateVectorError(y_AverageBinsGPU, y_AverageBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average Hist GPU: ";
+            validateVectorError(u_AverageBinsGPU, u_AverageBinsCPU);
+
+            std::cout << "Validating V Average Hist GPU: ";
+            validateVectorError(v_AverageBinsGPU, v_AverageBinsCPU);
         }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
-        std::cout << "Validating U Average Histogram GPU: ";
-        if (ValidateVector<int>(u_AverageBinsGPU, u_AverageBinsCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        } 
-        std::cout << "Validating V Average Histogram GPU: ";
-        if (ValidateVector<int>(v_AverageBinsGPU, v_AverageBinsCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }  
 
         std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
         std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeAverageHistGPU + u_ElapsedTimeAverageHistGPU + v_ElapsedTimeAverageHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeAverageHistGPU + u_ElapsedTimeAverageHistGPU + v_ElapsedTimeAverageHistGPU << std::endl;
+        }
 
         // Export Histogram
         if (EXPORT_AVERAGE_HISTOGRAM) {
@@ -1122,7 +1267,7 @@ int main(int argc, char const *argv[])
         double v_ElapsedTimeAverageHistGPU;
 
         // Execute Average for Channel Y
-        averageKernel.setArg(0, y_pixelBuffer);
+        averageKernel.setArg(0, y_PixelBuffer);
         averageKernel.setArg(1, y_AverageBuffer);
         err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
         event.wait();
@@ -1145,7 +1290,7 @@ int main(int argc, char const *argv[])
         // Calculate other channels
         if (ALL_CHANNELS) {
             // U Channel
-            averageKernel.setArg(0, u_pixelBuffer);
+            averageKernel.setArg(0, u_PixelBuffer);
             averageKernel.setArg(1, u_AverageBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
             event.wait();
@@ -1165,7 +1310,7 @@ int main(int argc, char const *argv[])
             u_ElapsedTimeAverageHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
             
             // V Channel
-            averageKernel.setArg(0, v_pixelBuffer);
+            averageKernel.setArg(0, v_PixelBuffer);
             averageKernel.setArg(1, v_AverageBuffer);
             err = commandQueue.enqueueNDRangeKernel(averageKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
             event.wait();
@@ -1212,66 +1357,45 @@ int main(int argc, char const *argv[])
             std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
         }
         
-        // Validate
+        // Validate Average Vectors
         std::cout << "Validating Y Average GPU: ";
-        if (ValidateVector<double>(y_AverageGPU, y_AverageCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
+        validateVectorError(y_AverageGPU, y_AverageCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average GPU: ";
+            validateVectorError(u_AverageGPU, u_AverageCPU);
+
+            std::cout << "Validating V Average GPU: ";
+            validateVectorError(v_AverageGPU, v_AverageCPU);
         }
 
-        std::cout << "Validating Y Average Histogram GPU: ";
-        if (ValidateVector<int>(y_AverageBinsGPU, y_AverageBinsCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        // Validate Average Histogram Vectors
+        std::cout << "Validating Y Average Hist GPU: ";
+        validateVectorError(y_AverageBinsGPU, y_AverageBinsCPU);
 
-        std::cout << "Validating U Average GPU: ";
-        if (ValidateVector<double>(u_AverageGPU, u_AverageCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average Hist GPU: ";
+            validateVectorError(u_AverageBinsGPU, u_AverageBinsCPU);
 
-        std::cout << "Validating U Average Histogram GPU: ";
-        if (ValidateVector<int>(u_AverageBinsGPU, u_AverageBinsCPU)) {
-            std::cout << "PASS" << std::endl;
+            std::cout << "Validating V Average Hist GPU: ";
+            validateVectorError(v_AverageBinsGPU, v_AverageBinsCPU);
         }
-        else {
-            std::cout << "FAIL" << std::endl;
-        } 
-
-        std::cout << "Validating V Average GPU: ";
-        if (ValidateVector<double>(v_AverageGPU, v_AverageCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
-
-        std::cout << "Validating V Average Histogram GPU: ";
-        if (ValidateVector<int>(v_AverageBinsGPU, v_AverageBinsCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        } 
 
         std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
         std::cout << "Elapsed time Channel Y Average (ms) = " << y_ElapsedTimeAverageGPU << std::endl;
         std::cout << "Elapsed time Channel Y Histogram (ms) = " << y_ElapsedTimeAverageHistGPU << std::endl;
         std::cout << "Elapsed time Channel Y Avg + Hist (ms) = " << y_ElapsedTimeAverageGPU + y_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time Channel U Average (ms) = " << u_ElapsedTimeAverageGPU << std::endl;
-        std::cout << "Elapsed time Channel U Histogram (ms) = " << u_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time Channel U Avg + Hist (ms) = " << u_ElapsedTimeAverageGPU + u_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time Channel V Average (ms) = " << v_ElapsedTimeAverageGPU << std::endl;
-        std::cout << "Elapsed time Channel V Histogram (ms) = " << v_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time Channel V Avg + Hist (ms) = " << v_ElapsedTimeAverageGPU + v_ElapsedTimeAverageHistGPU << std::endl;
-        std::cout << "Elapsed time (Y + U + V) Avg + Hist (ms) = " << y_ElapsedTimeAverageGPU + y_ElapsedTimeAverageHistGPU + u_ElapsedTimeAverageGPU + u_ElapsedTimeAverageHistGPU + v_ElapsedTimeAverageGPU + v_ElapsedTimeAverageHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U Average (ms) = " << u_ElapsedTimeAverageGPU << std::endl;
+            std::cout << "Elapsed time Channel U Histogram (ms) = " << u_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time Channel U Avg + Hist (ms) = " << u_ElapsedTimeAverageGPU + u_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V Average (ms) = " << v_ElapsedTimeAverageGPU << std::endl;
+            std::cout << "Elapsed time Channel V Histogram (ms) = " << v_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V Avg + Hist (ms) = " << v_ElapsedTimeAverageGPU + v_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time Average (Y + U + V) (ms) = " << y_ElapsedTimeAverageGPU + u_ElapsedTimeAverageGPU + v_ElapsedTimeAverageGPU << std::endl;
+            std::cout << "Elapsed time Histogram (Y + U + V) (ms) = " << y_ElapsedTimeAverageHistGPU + u_ElapsedTimeAverageHistGPU + v_ElapsedTimeAverageHistGPU << std::endl;
+            std::cout << "Elapsed time Avg + Hist (Y + U + V) (ms) = " << y_ElapsedTimeAverageGPU + y_ElapsedTimeAverageHistGPU + u_ElapsedTimeAverageGPU + u_ElapsedTimeAverageHistGPU + v_ElapsedTimeAverageGPU + v_ElapsedTimeAverageHistGPU << std::endl;
+        }
     }
 
     if (VARIANCE_HISTOGRAM_TEST_1) {
@@ -1310,12 +1434,12 @@ int main(int argc, char const *argv[])
         }
         
         // Create Timer Variables
-        double y_ElapsedTimeAverageHistGPU;
-        double u_ElapsedTimeAverageHistGPU;
-        double v_ElapsedTimeAverageHistGPU;
+        double y_ElapsedTimeVarianceHistGPU;
+        double u_ElapsedTimeVarianceHistGPU;
+        double v_ElapsedTimeVarianceHistGPU;
 
         // Execute Histogram for Channel Y
-        varianceHistKernel.setArg(0, y_pixelBuffer);
+        varianceHistKernel.setArg(0, y_PixelBuffer);
         varianceHistKernel.setArg(1, numOfBinsBuffer);
         varianceHistKernel.setArg(2, y_VarianceHistBuffer);
         err = commandQueue.enqueueNDRangeKernel(varianceHistKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
@@ -1323,12 +1447,12 @@ int main(int argc, char const *argv[])
         if (DEBUG_MODE_GPU && err < 0) {
             std::cout << "Execution Y ERROR: " << err << std::endl;
         }
-        y_ElapsedTimeAverageHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        y_ElapsedTimeVarianceHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
         
         // Calculate other channels
         if (ALL_CHANNELS) {
             // U Channel
-            varianceHistKernel.setArg(0, u_pixelBuffer);
+            varianceHistKernel.setArg(0, u_PixelBuffer);
             varianceHistKernel.setArg(1, numOfBinsBuffer);
             varianceHistKernel.setArg(2, u_VarianceHistBuffer);
             err = commandQueue.enqueueNDRangeKernel(varianceHistKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
@@ -1336,10 +1460,10 @@ int main(int argc, char const *argv[])
             if (DEBUG_MODE_GPU && err < 0) {
                 std::cout << "Execution U ERROR: " << err << std::endl;
             }
-            u_ElapsedTimeAverageHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            u_ElapsedTimeVarianceHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
             
             // V Channel
-            varianceHistKernel.setArg(0, v_pixelBuffer);
+            varianceHistKernel.setArg(0, v_PixelBuffer);
             varianceHistKernel.setArg(1, numOfBinsBuffer);
             varianceHistKernel.setArg(2, v_VarianceHistBuffer);
             err = commandQueue.enqueueNDRangeKernel(varianceHistKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
@@ -1347,7 +1471,7 @@ int main(int argc, char const *argv[])
             if (DEBUG_MODE_GPU && err < 0) {
                 std::cout << "Execution V ERROR: " << err << std::endl;
             }
-            v_ElapsedTimeAverageHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            v_ElapsedTimeVarianceHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
             
         }
 
@@ -1365,34 +1489,25 @@ int main(int argc, char const *argv[])
             std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
         }
         
-        // Validate Average Histogram of Channel Y
-        std::cout << "Validating Y Variance Histogram GPU: ";
-        if (ValidateVector<int>(y_VarianceBinsGPU, y_VarianceBinsCPU)) {
-            std::cout << "PASS" << std::endl;
+        // Validate Variance Histogram Vectors
+        std::cout << "Validating Y Variance Hist GPU: ";
+        validateVectorError(y_VarianceBinsGPU, y_VarianceBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Variance Hist GPU: ";
+            validateVectorError(u_VarianceBinsGPU, u_VarianceBinsCPU);
+
+            std::cout << "Validating V Variance Hist GPU: ";
+            validateVectorError(v_VarianceBinsGPU, v_VarianceBinsCPU);
         }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }
-        std::cout << "Validating U Variance Histogram GPU: ";
-        if (ValidateVector<int>(u_VarianceBinsGPU, u_VarianceBinsCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        } 
-        std::cout << "Validating V Variance Histogram GPU: ";
-        if (ValidateVector<int>(v_VarianceBinsGPU, v_VarianceBinsCPU)) {
-            std::cout << "PASS" << std::endl;
-        }
-        else {
-            std::cout << "FAIL" << std::endl;
-        }  
 
         std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
-        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeVarianceHistCPU << std::endl;
-        std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeVarianceHistCPU << std::endl;
-        std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeVarianceHistCPU << std::endl;
-        std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeVarianceHistCPU + u_ElapsedTimeVarianceHistCPU + v_ElapsedTimeVarianceHistCPU << std::endl;
+        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeVarianceHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeVarianceHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeVarianceHistGPU << std::endl;
+            std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeVarianceHistGPU + u_ElapsedTimeVarianceHistGPU + v_ElapsedTimeVarianceHistGPU << std::endl;
+        }
 
         // Export Histogram
         if (EXPORT_VARIANCE_HISTOGRAM) {
@@ -1422,6 +1537,452 @@ int main(int argc, char const *argv[])
                 }
             }
             outputHistogramGPU.close();
+        }
+    }
+
+    if (VARIANCE_HISTOGRAM_TEST_2) {
+        std::cout << "\n==================VARIANCE HISTOGRAM TEST 2====================\n\n";
+        // Create Output Buffers
+        cl::Buffer y_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Create Output Vectors
+        std::vector<int> y_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<int> u_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<int> v_VarianceBinsGPU(NUM_OF_BINS);
+
+        // Initialize Hist Buffer
+        err = commandQueue.enqueueWriteBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        
+        // Create Timer Variables
+        double y_ElapsedTimeVarianceHistGPU;
+        double u_ElapsedTimeVarianceHistGPU;
+        double v_ElapsedTimeVarianceHistGPU;
+
+        // Execute Histogram for Channel Y
+        varianceOnePassHistKernel.setArg(0, y_PixelBuffer);
+        varianceOnePassHistKernel.setArg(1, numOfBinsBuffer);
+        varianceOnePassHistKernel.setArg(2, y_VarianceHistBuffer);
+        err = commandQueue.enqueueNDRangeKernel(varianceOnePassHistKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
+        event.wait();
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Execution Y ERROR: " << err << std::endl;
+        }
+        y_ElapsedTimeVarianceHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        
+        // Calculate other channels
+        if (ALL_CHANNELS) {
+            // U Channel
+            varianceOnePassHistKernel.setArg(0, u_PixelBuffer);
+            varianceOnePassHistKernel.setArg(1, numOfBinsBuffer);
+            varianceOnePassHistKernel.setArg(2, u_VarianceHistBuffer);
+            err = commandQueue.enqueueNDRangeKernel(varianceOnePassHistKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution U ERROR: " << err << std::endl;
+            }
+            u_ElapsedTimeVarianceHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+            // V Channel
+            varianceOnePassHistKernel.setArg(0, v_PixelBuffer);
+            varianceOnePassHistKernel.setArg(1, numOfBinsBuffer);
+            varianceOnePassHistKernel.setArg(2, v_VarianceHistBuffer);
+            err = commandQueue.enqueueNDRangeKernel(varianceOnePassHistKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution V ERROR: " << err << std::endl;
+            }
+            v_ElapsedTimeVarianceHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+        }
+
+        // Read responsess
+        err = commandQueue.enqueueReadBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        
+        // Validate Variance Histogram Vectors
+        std::cout << "Validating Y Variance Hist GPU: ";
+        validateVectorError(y_VarianceBinsGPU, y_VarianceBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Variance Hist GPU: ";
+            validateVectorError(u_VarianceBinsGPU, u_VarianceBinsCPU);
+
+            std::cout << "Validating V Variance Hist GPU: ";
+            validateVectorError(v_VarianceBinsGPU, v_VarianceBinsCPU);
+        }
+
+        std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
+        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeVarianceHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeVarianceHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeVarianceHistGPU << std::endl;
+            std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeVarianceHistGPU + u_ElapsedTimeVarianceHistGPU + v_ElapsedTimeVarianceHistGPU << std::endl;
+        }
+    }
+
+    if (ALL_HISTOGRAMS_TEST_1) {
+        std::cout << "\n==================ALL HISTOGRAMS TEST 1====================\n\n";
+        // Create Output Buffers
+        cl::Buffer y_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        cl::Buffer y_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Create Output Vectors
+        std::vector<int> y_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> u_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> v_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> y_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<int> u_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<int> v_VarianceBinsGPU(NUM_OF_BINS);
+
+        // Initialize Hist Buffer
+        err = commandQueue.enqueueWriteBuffer(y_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        
+        // Create Timer Variables
+        double y_ElapsedTimeAllHistGPU;
+        double u_ElapsedTimeAllHistGPU;
+        double v_ElapsedTimeAllHistGPU;
+
+        // Execute Histogram for Channel Y
+        allHistsKernel.setArg(0, y_PixelBuffer);
+        allHistsKernel.setArg(1, numOfBinsBuffer);
+        allHistsKernel.setArg(2, y_AverageHistBuffer);
+        allHistsKernel.setArg(3, y_VarianceHistBuffer);
+        err = commandQueue.enqueueNDRangeKernel(allHistsKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
+        event.wait();
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Execution Y ERROR: " << err << std::endl;
+        }
+        y_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        
+        // Calculate other channels
+        if (ALL_CHANNELS) {
+            // U Channel
+            allHistsKernel.setArg(0, u_PixelBuffer);
+            allHistsKernel.setArg(1, numOfBinsBuffer);
+            allHistsKernel.setArg(2, u_AverageHistBuffer);
+            allHistsKernel.setArg(3, u_VarianceHistBuffer);
+            err = commandQueue.enqueueNDRangeKernel(allHistsKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution U ERROR: " << err << std::endl;
+            }
+            u_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+            // V Channel
+            allHistsKernel.setArg(0, v_PixelBuffer);
+            allHistsKernel.setArg(1, numOfBinsBuffer);
+            allHistsKernel.setArg(2, v_AverageHistBuffer);
+            allHistsKernel.setArg(3, v_VarianceHistBuffer);
+            err = commandQueue.enqueueNDRangeKernel(allHistsKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution V ERROR: " << err << std::endl;
+            }
+            v_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+        }
+
+        // Read responsess
+        err = commandQueue.enqueueReadBuffer(y_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Validate Average Histogram Vectors
+        std::cout << "Validating Y Average Hist GPU: ";
+        validateVectorError(y_AverageBinsGPU, y_AverageBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average Hist GPU: ";
+            validateVectorError(u_AverageBinsGPU, u_AverageBinsCPU);
+
+            std::cout << "Validating V Average Hist GPU: ";
+            validateVectorError(v_AverageBinsGPU, v_AverageBinsCPU);
+        }
+
+        // Validate Variance Histogram Vectors
+        std::cout << "Validating Y Variance Hist GPU: ";
+        validateVectorError(y_VarianceBinsGPU, y_VarianceBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Variance Hist GPU: ";
+            validateVectorError(u_VarianceBinsGPU, u_VarianceBinsCPU);
+
+            std::cout << "Validating V Variance Hist GPU: ";
+            validateVectorError(v_VarianceBinsGPU, v_VarianceBinsCPU);
+        }
+
+        std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
+        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeAllHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeAllHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeAllHistGPU << std::endl;
+            std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeAllHistGPU + u_ElapsedTimeAllHistGPU + v_ElapsedTimeAllHistGPU << std::endl;
+        }
+    }
+
+    if (ALL_HISTOGRAMS_TEST_1) {
+        std::cout << "\n==================ALL HISTOGRAMS TEST 2====================\n\n";
+        // Create Output Buffers
+        cl::Buffer y_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        cl::Buffer y_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Create Output Vectors
+        std::vector<int> y_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> u_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> v_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> y_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<int> u_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<int> v_VarianceBinsGPU(NUM_OF_BINS);
+
+        // Initialize Hist Buffer
+        err = commandQueue.enqueueWriteBuffer(y_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        
+        // Create Timer Variables
+        double y_ElapsedTimeAllHistGPU;
+        double u_ElapsedTimeAllHistGPU;
+        double v_ElapsedTimeAllHistGPU;
+
+        // Execute Histogram for Channel Y
+        allHistsOnePassKernel.setArg(0, y_PixelBuffer);
+        allHistsOnePassKernel.setArg(1, numOfBinsBuffer);
+        allHistsOnePassKernel.setArg(2, y_AverageHistBuffer);
+        allHistsOnePassKernel.setArg(3, y_VarianceHistBuffer);
+        err = commandQueue.enqueueNDRangeKernel(allHistsOnePassKernel, cl::NullRange, y_GlobalRange, y_LocalRange, NULL, &event);
+        event.wait();
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Execution Y ERROR: " << err << std::endl;
+        }
+        y_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        
+        // Calculate other channels
+        if (ALL_CHANNELS) {
+            // U Channel
+            allHistsOnePassKernel.setArg(0, u_PixelBuffer);
+            allHistsOnePassKernel.setArg(1, numOfBinsBuffer);
+            allHistsOnePassKernel.setArg(2, u_AverageHistBuffer);
+            allHistsOnePassKernel.setArg(3, u_VarianceHistBuffer);
+            err = commandQueue.enqueueNDRangeKernel(allHistsOnePassKernel, cl::NullRange, u_GlobalRange, u_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution U ERROR: " << err << std::endl;
+            }
+            u_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+            // V Channel
+            allHistsOnePassKernel.setArg(0, v_PixelBuffer);
+            allHistsOnePassKernel.setArg(1, numOfBinsBuffer);
+            allHistsOnePassKernel.setArg(2, v_AverageHistBuffer);
+            allHistsOnePassKernel.setArg(3, v_VarianceHistBuffer);
+            err = commandQueue.enqueueNDRangeKernel(allHistsOnePassKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution V ERROR: " << err << std::endl;
+            }
+            v_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+        }
+
+        // Read responsess
+        err = commandQueue.enqueueReadBuffer(y_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Validate Average Histogram Vectors
+        std::cout << "Validating Y Average Hist GPU: ";
+        validateVectorError(y_AverageBinsGPU, y_AverageBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average Hist GPU: ";
+            validateVectorError(u_AverageBinsGPU, u_AverageBinsCPU);
+
+            std::cout << "Validating V Average Hist GPU: ";
+            validateVectorError(v_AverageBinsGPU, v_AverageBinsCPU);
+        }
+
+        // Validate Variance Histogram Vectors
+        std::cout << "Validating Y Variance Hist GPU: ";
+        validateVectorError(y_VarianceBinsGPU, y_VarianceBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Variance Hist GPU: ";
+            validateVectorError(u_VarianceBinsGPU, u_VarianceBinsCPU);
+
+            std::cout << "Validating V Variance Hist GPU: ";
+            validateVectorError(v_VarianceBinsGPU, v_VarianceBinsCPU);
+        }
+
+        std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
+        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeAllHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeAllHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeAllHistGPU << std::endl;
+            std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeAllHistGPU + u_ElapsedTimeAllHistGPU + v_ElapsedTimeAllHistGPU << std::endl;
         }
     }
 
