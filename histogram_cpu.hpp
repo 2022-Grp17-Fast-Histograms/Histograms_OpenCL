@@ -23,7 +23,7 @@ void calculateAverage(std::vector<int> imageVector, int globalOffset, int imageW
         }
         average[block] = (double)blocksum / blockSize;
         x += blockWidth;
-        if (x >= imageWidth) {
+        if (x + blockWidth > imageWidth) {
             x = 0;
             y += blockHeight;
         }
@@ -50,7 +50,7 @@ void calculateVariance(std::vector<int> imageVector, int globalOffset, int image
         }
         variance[block] = (double)variancesum / blockSize;
         x += blockWidth;
-        if (x >= imageWidth) {
+        if (x + blockWidth > imageWidth) {
             x = 0;
             y += blockHeight;
         }
@@ -89,7 +89,7 @@ void calculateAverageAndVariance(std::vector<int> imageVector, int globalOffset,
         }
         variance[block] = (double)variancesum / blockSize;
         x += blockWidth;
-        if (x >= imageWidth) {
+        if (x + blockWidth > imageWidth) {
             x = 0;
             y += blockHeight;
         }
@@ -105,7 +105,7 @@ void calculateHistogram(std::vector<double> input, int numOfBins, std::vector<in
     }
 }
 
-void calculateHistogram(std::vector<double> input, int numOfBins, std::vector<int> &bins, std::vector<double> increment) {
+void calculateHistogram(std::vector<double> input, int numOfBins, std::vector<double> &bins, std::vector<double> increment) {
     int binSize = 256/numOfBins;
 
     for (int i = 0; i < input.size(); i++) {
@@ -142,6 +142,6 @@ void validateVectorError(std::vector<T> input, std::vector<U> validatingVector) 
         
     }
     else {
-        std::cout << "FAIL... Error = " << error << " %" << std::endl;
+        std::cout << "FAIL... Error = " << std::setprecision(10) << error << " %" << std::setprecision(4) << std::endl;
     }
 }

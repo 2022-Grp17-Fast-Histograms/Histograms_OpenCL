@@ -6,8 +6,8 @@
 *.pdb
 
 # Output Files
-Output Images/*.yuv
-Output Histograms/*.txt
+Output Images/*
+Output Histograms/*
 
 # Vscode
 .vscode/*.json
