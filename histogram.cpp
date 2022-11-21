@@ -22,21 +22,22 @@ const bool SHOW_CPU_TEST = false;
 
 // Choose tests to run
 const bool ALL_CHANNELS = true;                             // TRUE = CALCULATE FOR ALL CHANNELS; FALSE = CALCULATE ONLY FOR LUMA (Y)
-const bool AVERAGE_TEST_1 = true;                           // AVERAGE ONLY
-const bool AVERAGE_TEST_2 = true;                           // AVERAGE ONLY (INCREMENTAL AVERAGE ALG)
-const bool VARIANCE_TEST_1 = true;                          // AVERAGE + VARIANCE (ON SAME KERNEL)
-const bool VARIANCE_TEST_2 = true;                          // AVERAGE THEN VARIANCE (2 KERNELS)
-const bool VARIANCE_TEST_3 = true;                          // AVERAGE + VARIANCE (ONE PASS ALG)
-const bool AVERAGE_HISTOGRAM_TEST_1 = true;                 // AVERAGE HISTOGRAM (ON SAME KERNEL)
-const bool AVERAGE_HISTOGRAM_TEST_2 = true;                 // AVERAGE THEN AVERAGE HISTOGRAM (2 KERNELS)
-const bool VARIANCE_HISTOGRAM_TEST_1 = true;                // VARIANCE HISTOGRAMS (ON SAME KERNEL)
-const bool VARIANCE_HISTOGRAM_TEST_2 = true;                // VARIANCE HISTOGRAMS (ONE PASS ALG)
-const bool ALL_HISTOGRAMS_TEST_1 = true;                     // ALL HISTOGRAMS
+const bool AVERAGE_TEST_1 = false;                           // AVERAGE ONLY
+const bool AVERAGE_TEST_2 = false;                           // AVERAGE ONLY (INCREMENTAL AVERAGE ALG)
+const bool VARIANCE_TEST_1 = false;                          // AVERAGE + VARIANCE (ON SAME KERNEL)
+const bool VARIANCE_TEST_2 = false;                          // AVERAGE THEN VARIANCE (2 KERNELS)
+const bool VARIANCE_TEST_3 = false;                          // AVERAGE + VARIANCE (ONE PASS ALG)
+const bool AVERAGE_HISTOGRAM_TEST_1 = false;                 // AVERAGE HISTOGRAM (ON SAME KERNEL)
+const bool AVERAGE_HISTOGRAM_TEST_2 = false;                 // AVERAGE THEN AVERAGE HISTOGRAM (2 KERNELS)
+const bool VARIANCE_HISTOGRAM_TEST_1 = false;                // VARIANCE HISTOGRAMS (ON SAME KERNEL)
+const bool VARIANCE_HISTOGRAM_TEST_2 = false;                // VARIANCE HISTOGRAMS (ONE PASS ALG)
+const bool ALL_HISTOGRAMS_TEST_1 = false;                     // ALL HISTOGRAMS
 const bool ALL_HISTOGRAMS_TEST_2 = true;                     // ALL HISTOGRAMS (ONE PASS ALG)
+const bool ALL_HISTOGRAMS_TEST_3 = true;                     // ALL HISTOGRAMS (ONE PASS ALG W/ HALF THREADS)
 
 // Choose outputs to be generated
-const bool GENERATE_AVERAGE_IMG = false;                     // NEEDS AVERAGE TEST 1
-const bool GENERATE_VARIANCE_IMG = false;                    // NEEDS VARIANCE TEST 1
+const bool GENERATE_AVERAGE_IMG = true;                     // NEEDS AVERAGE TEST 1
+const bool GENERATE_VARIANCE_IMG = true;                    // NEEDS VARIANCE TEST 1
 const bool EXPORT_AVERAGE_HISTOGRAM = true;                 // NEEDS AVERAGE HISTOGRAM TEST 1 FOR GPU HISTOGRAM
 const bool EXPORT_VARIANCE_HISTOGRAM = true;                // NEEDS VARIANCE HISTOGRAM TEST 1 FOR GPU HISTOGRAM
 
@@ -363,6 +364,8 @@ int main(int argc, char const *argv[])
     cl::Kernel varianceOnePassHistKernel(program, "calculateOnePassVarianceHistogram");
     cl::Kernel allHistsKernel(program, "calculateAllHistograms");
     cl::Kernel allHistsOnePassKernel(program, "calculateAllHistogramsOnePass");
+    cl::Kernel allHistsOnePassHalfKernel(program, "calculateAllHistogramsOnePassHalf");
+    //cl::Kernel allHistsOnePassAllChannelsKernel(program, "calculateAllHistogramsOnePassAllChannels");
     
     // Create Input Buffers
     cl::Buffer y_PixelBuffer(context, CL_MEM_READ_ONLY, y_Size * sizeof(int), NULL, &err);
@@ -1248,31 +1251,34 @@ int main(int argc, char const *argv[])
 
         // Export Histogram
         if (EXPORT_AVERAGE_HISTOGRAM) {
-            std::ofstream outputHistogramGPU ("Output Histograms/AVERAGE_HISTOGRAM_Y.txt");
+            std::ofstream outputHistogramGPU ("Output Histograms/AVERAGE_HISTOGRAM_Y.txt", std::ios_base::app);
             for (int i = 0; i < y_AverageBinsGPU.size(); i++) {
                 outputHistogramGPU << y_AverageBinsGPU[i];
                 if (i + 1 < y_AverageBinsGPU.size()) {
                     outputHistogramGPU << ",";
                 }
             }
+            outputHistogramGPU << "\n";
             outputHistogramGPU.close();
 
-            outputHistogramGPU = std::ofstream("Output Histograms/AVERAGE_HISTOGRAM_U.txt");
+            outputHistogramGPU = std::ofstream("Output Histograms/AVERAGE_HISTOGRAM_U.txt", std::ios_base::app);
             for (int i = 0; i < u_AverageBinsGPU.size(); i++) {
                 outputHistogramGPU << u_AverageBinsGPU[i];
                 if (i + 1 < u_AverageBinsGPU.size()) {
                     outputHistogramGPU << ",";
                 }
             }
+            outputHistogramGPU << "\n";
             outputHistogramGPU.close();
 
-            outputHistogramGPU = std::ofstream("Output Histograms/AVERAGE_HISTOGRAM_V.txt");
+            outputHistogramGPU = std::ofstream("Output Histograms/AVERAGE_HISTOGRAM_V.txt", std::ios_base::app);
             for (int i = 0; i < v_AverageBinsGPU.size(); i++) {
                 outputHistogramGPU << v_AverageBinsGPU[i];
                 if (i + 1 < v_AverageBinsGPU.size()) {
                     outputHistogramGPU << ",";
                 }
             }
+            outputHistogramGPU << "\n";
             outputHistogramGPU.close();
         }
     }
@@ -1593,31 +1599,34 @@ int main(int argc, char const *argv[])
 
         // Export Histogram
         if (EXPORT_VARIANCE_HISTOGRAM) {
-            std::ofstream outputHistogramGPU ("Output Histograms/VARIANCE_HISTOGRAM_Y.txt");
+            std::ofstream outputHistogramGPU ("Output Histograms/VARIANCE_HISTOGRAM_Y.txt", std::ios_base::app);
             for (int i = 0; i < y_VarianceBinsGPU.size(); i++) {
                 outputHistogramGPU << y_VarianceBinsGPU[i];
                 if (i + 1 < y_VarianceBinsGPU.size()) {
                     outputHistogramGPU << ",";
                 }
             }
+            outputHistogramGPU << "\n";
             outputHistogramGPU.close();
 
-            outputHistogramGPU = std::ofstream("Output Histograms/VARIANCE_HISTOGRAM_U.txt");
+            outputHistogramGPU = std::ofstream("Output Histograms/VARIANCE_HISTOGRAM_U.txt", std::ios_base::app);
             for (int i = 0; i < u_VarianceBinsGPU.size(); i++) {
                 outputHistogramGPU << u_VarianceBinsGPU[i];
                 if (i + 1 < u_VarianceBinsGPU.size()) {
                     outputHistogramGPU << ",";
                 }
             }
+            outputHistogramGPU << "\n";
             outputHistogramGPU.close();
 
-            outputHistogramGPU = std::ofstream("Output Histograms/VARIANCE_HISTOGRAM_V.txt");
+            outputHistogramGPU = std::ofstream("Output Histograms/VARIANCE_HISTOGRAM_V.txt", std::ios_base::app);
             for (int i = 0; i < v_VarianceBinsGPU.size(); i++) {
                 outputHistogramGPU << v_VarianceBinsGPU[i];
                 if (i + 1 < v_VarianceBinsGPU.size()) {
                     outputHistogramGPU << ",";
                 }
             }
+            outputHistogramGPU << "\n";
             outputHistogramGPU.close();
         }
     }
@@ -2022,6 +2031,187 @@ int main(int argc, char const *argv[])
             allHistsOnePassKernel.setArg(4, v_BlockSize * sizeof(int), NULL);
             allHistsOnePassKernel.setArg(5, v_BlockSize * sizeof(int), NULL);
             err = commandQueue.enqueueNDRangeKernel(allHistsOnePassKernel, cl::NullRange, v_GlobalRange, v_LocalRange, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution V ERROR: " << err << std::endl;
+            }
+            v_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+        }
+
+        // Read responsess
+        err = commandQueue.enqueueReadBuffer(y_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(float), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(float), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueReadBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(float), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Validate Average Histogram Vectors
+        std::cout << "Validating Y Average Hist GPU: ";
+        validateVectorError(y_AverageBinsGPU, y_AverageBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Average Hist GPU: ";
+            validateVectorError(u_AverageBinsGPU, u_AverageBinsCPU);
+
+            std::cout << "Validating V Average Hist GPU: ";
+            validateVectorError(v_AverageBinsGPU, v_AverageBinsCPU);
+        }
+
+        // Validate Variance Histogram Vectors
+        std::cout << "Validating Y Variance Hist GPU: ";
+        validateVectorError(y_VarianceBinsGPU, y_VarianceBinsCPU);
+
+        if (ALL_CHANNELS) {
+            std::cout << "Validating U Variance Hist GPU: ";
+            validateVectorError(u_VarianceBinsGPU, u_VarianceBinsCPU);
+
+            std::cout << "Validating V Variance Hist GPU: ";
+            validateVectorError(v_VarianceBinsGPU, v_VarianceBinsCPU);
+        }
+
+        std::cout << "\n---------------------------SUMMARY----------------------------\n\n";
+        std::cout << "Elapsed time Channel Y (ms) = " << y_ElapsedTimeAllHistGPU << std::endl;
+        if (ALL_CHANNELS) {
+            std::cout << "Elapsed time Channel U (ms) = " << u_ElapsedTimeAllHistGPU << std::endl;
+            std::cout << "Elapsed time Channel V (ms) = " << v_ElapsedTimeAllHistGPU << std::endl;
+            std::cout << "Elapsed time (Y + U + V) (ms) = " << y_ElapsedTimeAllHistGPU + u_ElapsedTimeAllHistGPU + v_ElapsedTimeAllHistGPU << std::endl;
+        }
+    }
+
+    if (ALL_HISTOGRAMS_TEST_3) {
+        std::cout << "\n==================ALL HISTOGRAMS TEST 3====================\n\n";
+        // Create Output Buffers
+        cl::Buffer y_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_AverageHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(int), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        cl::Buffer y_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(float), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer u_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(float), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        cl::Buffer v_VarianceHistBuffer(context, CL_MEM_READ_WRITE, NUM_OF_BINS * sizeof(float), NULL, &err);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Create v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+
+        // Create Output Vectors
+        std::vector<int> y_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> u_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<int> v_AverageBinsGPU(NUM_OF_BINS);
+        std::vector<float> y_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<float> u_VarianceBinsGPU(NUM_OF_BINS);
+        std::vector<float> v_VarianceBinsGPU(NUM_OF_BINS);
+
+        // Initialize Hist Buffer
+        err = commandQueue.enqueueWriteBuffer(y_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &y_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &u_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_AverageHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(int), &v_AverageBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_AverageHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(y_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(float), &y_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading y_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(u_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(float), &u_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading u_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        err = commandQueue.enqueueWriteBuffer(v_VarianceHistBuffer, CL_TRUE, 0, NUM_OF_BINS * sizeof(float), &v_VarianceBinsGPU[0], NULL, NULL);
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Reading v_VarianceHistBuffer ERROR: " << err << std::endl;
+        }
+        
+        // Create Timer Variables
+        double y_ElapsedTimeAllHistGPU;
+        double u_ElapsedTimeAllHistGPU;
+        double v_ElapsedTimeAllHistGPU;
+
+
+        cl::NDRange y_GlobalRangeH(adjustDimension(IMG_WIDTH/2, y_BlockWidth/2), adjustDimension(IMG_HEIGHT/2, y_BlockHeight/2));
+        cl::NDRange y_LocalRangeH(y_BlockWidth/2, y_BlockHeight/2);
+        cl::NDRange u_GlobalRangeH(adjustDimension(IMG_WIDTH/4, u_BlockWidth/2), adjustDimension(IMG_HEIGHT/4, u_BlockHeight/2));
+        cl::NDRange u_LocalRangeH(u_BlockWidth/2, u_BlockHeight/2);
+        cl::NDRange v_GlobalRangeH(adjustDimension(IMG_WIDTH/4, v_BlockWidth/2), adjustDimension(IMG_HEIGHT/4, v_BlockHeight/2));
+        cl::NDRange v_LocalRangeH(v_BlockWidth/2, v_BlockHeight/2);
+
+        // Execute Histogram for Channel Y
+        allHistsOnePassHalfKernel.setArg(0, y_PixelBuffer);
+        allHistsOnePassHalfKernel.setArg(1, numOfBinsBuffer);
+        allHistsOnePassHalfKernel.setArg(2, y_AverageHistBuffer);
+        allHistsOnePassHalfKernel.setArg(3, y_VarianceHistBuffer);
+        allHistsOnePassHalfKernel.setArg(4, y_BlockSize * sizeof(int), NULL);
+        allHistsOnePassHalfKernel.setArg(5, y_BlockSize * sizeof(int), NULL);
+        err = commandQueue.enqueueNDRangeKernel(allHistsOnePassHalfKernel, cl::NullRange, y_GlobalRangeH, y_LocalRangeH, NULL, &event);
+        event.wait();
+        if (DEBUG_MODE_GPU && err < 0) {
+            std::cout << "Execution Y ERROR: " << err << std::endl;
+        }
+        y_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+        
+        // Calculate other channels
+        if (ALL_CHANNELS) {
+            // U Channel
+            allHistsOnePassHalfKernel.setArg(0, u_PixelBuffer);
+            allHistsOnePassHalfKernel.setArg(1, numOfBinsBuffer);
+            allHistsOnePassHalfKernel.setArg(2, u_AverageHistBuffer);
+            allHistsOnePassHalfKernel.setArg(3, u_VarianceHistBuffer);
+            allHistsOnePassHalfKernel.setArg(4, u_BlockSize * sizeof(int), NULL);
+            allHistsOnePassHalfKernel.setArg(5, u_BlockSize * sizeof(int), NULL);
+            err = commandQueue.enqueueNDRangeKernel(allHistsOnePassHalfKernel, cl::NullRange, u_GlobalRangeH, u_LocalRangeH, NULL, &event);
+            event.wait();
+            if (DEBUG_MODE_GPU && err < 0) {
+                std::cout << "Execution U ERROR: " << err << std::endl;
+            }
+            u_ElapsedTimeAllHistGPU = (1e-6) * (event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - event.getProfilingInfo<CL_PROFILING_COMMAND_START>());
+            
+            // V Channel
+            allHistsOnePassHalfKernel.setArg(0, v_PixelBuffer);
+            allHistsOnePassHalfKernel.setArg(1, numOfBinsBuffer);
+            allHistsOnePassHalfKernel.setArg(2, v_AverageHistBuffer);
+            allHistsOnePassHalfKernel.setArg(3, v_VarianceHistBuffer);
+            allHistsOnePassHalfKernel.setArg(4, v_BlockSize * sizeof(int), NULL);
+            allHistsOnePassHalfKernel.setArg(5, v_BlockSize * sizeof(int), NULL);
+            err = commandQueue.enqueueNDRangeKernel(allHistsOnePassHalfKernel, cl::NullRange, v_GlobalRangeH, v_LocalRangeH, NULL, &event);
             event.wait();
             if (DEBUG_MODE_GPU && err < 0) {
                 std::cout << "Execution V ERROR: " << err << std::endl;

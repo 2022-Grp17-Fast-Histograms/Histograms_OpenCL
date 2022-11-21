@@ -1,6 +1,6 @@
 #pragma CL_VERSION_3_0
 
-//inline PTX atomic_add using float
+//inline PTX atomic_add using float (Only works for nvidia)
 void atomic_add_float(global float *p, float val)
 {
     float prev;
@@ -334,13 +334,30 @@ kernel void calculateAllHistograms(global const int *pixels, global const int *n
     blockSumAverage[l_linear] = pixels[g_linear];
     
     // Loop summing by splitting work group in half
-    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+    /* for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
             blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
         }
+    } */
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (blockSize >= 64 && l_linear < 32) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 32];
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 16];
     }
+
+    if (blockSize >= 16 && l_linear < 8) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 8];
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 4];
+    }
+
+    if (blockSize >= 4 && l_linear < 2) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 2];
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 1];
+    }      
 
     // Update average array
     if (l_linear == 0) {
@@ -353,14 +370,31 @@ kernel void calculateAllHistograms(global const int *pixels, global const int *n
     // Calculate initial portion of variance and copy to local memory
     blockSumVariance[l_linear] = (pixels[g_linear] - average[0]) * (pixels[g_linear] - average[0]);
 
-    // Loop summing by splitting work group in half
+    /* // Loop summing by splitting work group in half
     for (uint stride = blockSize/2; stride > 0; stride /= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
         
         if (l_linear < stride) {
             blockSumVariance[l_linear] += blockSumVariance[l_linear + stride];
         }
+    } */
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (blockSize >= 64 && l_linear < 32) {
+        blockSumVariance[l_linear] += blockSumVariance[l_linear + 32];
+        blockSumVariance[l_linear] += blockSumVariance[l_linear + 16];
     }
+
+    if (blockSize >= 16 && l_linear < 8) {
+        blockSumVariance[l_linear] += blockSumVariance[l_linear + 8];
+        blockSumVariance[l_linear] += blockSumVariance[l_linear + 4];
+    }
+
+    if (blockSize >= 4 && l_linear < 2) {
+        blockSumVariance[l_linear] += blockSumVariance[l_linear + 2];
+        blockSumVariance[l_linear] += blockSumVariance[l_linear + 1];
+    }    
 
     // Update variance array
     if (l_linear == 0) {
@@ -380,23 +414,65 @@ kernel void calculateAllHistogramsOnePass(global const int *pixels, global const
 
     // Get global id
     int g_linear = get_global_linear_id();
-    
+
     // Get block position and size
     int blockSize = get_local_size(0) * get_local_size(1);
-
+    
     // Copy memory from global to local
     blockSumAverage[l_linear] = pixels[g_linear];
     blockSumSquares[l_linear] = pixels[g_linear] * pixels[g_linear];
 
-    // Loop summing by splitting work group in half
-    for (uint stride = blockSize/2; stride > 0; stride /= 2) {
+    barrier(CLK_LOCAL_MEM_FENCE); 
+
+    if (blockSize == 1024 && l_linear < 512) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 512];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 512];
         barrier(CLK_LOCAL_MEM_FENCE);
-        
-        if (l_linear < stride) {
-            blockSumAverage[l_linear] += blockSumAverage[l_linear + stride];
-            blockSumSquares[l_linear] += blockSumSquares[l_linear + stride];
-        }
     }
+
+    if (blockSize >= 512 && l_linear < 256) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 256];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 256];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (blockSize >= 256 && l_linear < 128) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 128];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 128];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (blockSize >= 128 && l_linear < 64) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 64];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 64];
+    }
+
+    //barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (l_linear < 32) {
+        if (blockSize >= 64) {
+            barrier(CLK_LOCAL_MEM_FENCE);
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 32];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 32];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 16];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 16];
+        }
+
+        if (blockSize >= 16) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 8];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 8];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 4];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 4];
+        }
+
+        if (blockSize >= 4) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 2];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 2];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 1];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 1];
+        } 
+    }
+    
 
     // Update average array
     if (l_linear == 0) {
@@ -405,6 +481,103 @@ kernel void calculateAllHistogramsOnePass(global const int *pixels, global const
 
         // Calculate variance
         float variance = (float)blockSumSquares[0]/blockSize - average * average;
+
+        // Calculate bin
+        int interval = ((int)average*numOfBins[0])>>8;
+
+        atomic_inc(&averageBins[interval]);
+        atomic_add_float(&varianceBins[interval], variance);
+    }
+}
+
+kernel void calculateAllHistogramsOnePassHalf(global const int *pixels, global const int *numOfBins, global int *averageBins, global float *varianceBins, local int *blockSumAverage, local int *blockSumSquares) {
+    // Get local id
+    int l_linear = get_local_linear_id();
+
+    // Get global size
+    int globalWidth = get_global_size(0) * 2;
+
+    // Get block dimensions
+    int blockWidth = get_local_size(0);
+    int blockHeight = get_local_size(1);
+    int blockSize = blockWidth * blockHeight;
+
+    // Get global id
+    int g_x = get_group_id(0) * (2*blockWidth) + get_local_id(0);
+    int g_y = get_group_id(1) * (2*blockHeight) + get_local_id(1);
+    
+    int g_linear = (g_y * globalWidth) + g_x;
+    int g_linear_offset_x = g_linear + blockWidth;
+    int g_linear_offset_y = g_linear + (blockHeight * globalWidth);
+    int g_linear_offset_xy = g_linear_offset_y + blockWidth;
+    
+    // Copy memory from global to local and add offset positions
+    blockSumAverage[l_linear] = pixels[g_linear];
+    blockSumAverage[l_linear] += pixels[g_linear_offset_x];
+    blockSumAverage[l_linear] += pixels[g_linear_offset_y];
+    blockSumAverage[l_linear] += pixels[g_linear_offset_xy];
+
+    blockSumSquares[l_linear] = pixels[g_linear] * pixels[g_linear];
+    blockSumSquares[l_linear] += pixels[g_linear_offset_x] * pixels[g_linear_offset_x];
+    blockSumSquares[l_linear] += pixels[g_linear_offset_y] * pixels[g_linear_offset_y];
+    blockSumSquares[l_linear] += pixels[g_linear_offset_xy] * pixels[g_linear_offset_xy];
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (blockSize == 1024 && l_linear < 512) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 512];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 512];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (blockSize >= 512 && l_linear < 256) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 256];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 256];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (blockSize >= 256 && l_linear < 128) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 128];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 128];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (blockSize >= 128 && l_linear < 64) {
+        blockSumAverage[l_linear] += blockSumAverage[l_linear + 64];
+        blockSumSquares[l_linear] += blockSumSquares[l_linear + 64];
+    }
+
+    if (l_linear < 32) {
+        if (blockSize >= 64) {
+            barrier(CLK_LOCAL_MEM_FENCE);
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 32];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 32];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 16];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 16];
+        }
+
+        if (blockSize >= 16) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 8];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 8];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 4];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 4];
+        }
+
+        if (blockSize >= 4) {
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 2];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 2];
+            blockSumAverage[l_linear] += blockSumAverage[l_linear + 1];
+            blockSumSquares[l_linear] += blockSumSquares[l_linear + 1];
+        } 
+    }
+    
+    // Update average array
+    if (l_linear == 0) {
+        // Calculate average        
+        float average = (float)blockSumAverage[0]/(blockSize*4);
+
+        // Calculate variance
+        float variance = (float)blockSumSquares[0]/(blockSize*4) - average * average;
 
         // Calculate bin
         int interval = ((int)average*numOfBins[0])>>8;
